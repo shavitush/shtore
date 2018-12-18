@@ -1,0 +1,8 @@
+Plugin(source='addons/sourcemod/scripting/shtore.sp')
+
+Package(name='shtore',
+        plugins=['shtore'],
+        filegroups={
+            '.': ['README.md', 'LICENSE'],
+        },
+)
