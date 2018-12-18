@@ -64,6 +64,24 @@ stock StoreItem StoreItemToEnum(const char[] input)
 	return StoreItem_Unknown;
 }
 
+stock PrintToSerialNumber(int serial, const char[] input)
+{
+	if(serial == -1)
+	{
+		PrintToServer("%s", input);
+	}
+
+	else
+	{
+		int client = GetClientFromSerial(serial);
+
+		if(client != 0)
+		{
+			PrintToServer("%s", input);
+		}
+	}
+}
+
 /**
  * Use this native when printing anything in chat if it's related to the timer.
  * This native will auto-assign colors and a chat prefix.

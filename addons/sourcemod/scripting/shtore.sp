@@ -40,9 +40,12 @@ public Plugin myinfo =
 
 public void OnPluginStart()
 {
+	// globals
 	gA_Items = new ArrayList(sizeof(store_item_t));
-
 	SQL_DBConnect();
+
+	// commands
+	RegAdminCmd("sm_reloadstoreitems", Command_ReloadStoreItems, ADMFLAG_RCON, "Fetches shtore items from database.");
 }
 
 public void OnMapStart()
@@ -51,6 +54,20 @@ public void OnMapStart()
 	{
 		FetchStoreItems();
 	}
+}
+
+public Action Command_ReloadStoreItems(int client, int args)
+{
+	if(gH_Database == null)
+	{
+		ReplyToCommand(client, "Database is null.");
+
+		return Plugin_Handled;
+	}
+
+	FetchStoreItems(client);
+
+	return Plugin_Handled;
 }
 
 void SQL_DBConnect()
@@ -77,14 +94,16 @@ void SQL_DBConnect()
 	}
 }
 
-void FetchStoreItems()
+void FetchStoreItems(int client = 0)
 {
-	if(gH_Database == null)
+	int serial = -1;
+
+	if(client != 0)
 	{
-		return;
+		serial = GetClientSerial(client);
 	}
 
-	gH_Database.Query(SQL_FetchItems_Callback, "SELECT type, price, display, description, value FROM store_items;", 0, DBPrio_High);
+	gH_Database.Query(SQL_FetchItems_Callback, "SELECT type, price, display, description, value FROM store_items;", serial, DBPrio_High);
 }
 
 public int StoreItems_SortAscending(int index1, int index2, Handle array, Handle hndl)
@@ -155,4 +174,6 @@ public void SQL_FetchItems_Callback(Database db, DBResultSet results, const char
 
 	PrintToServer("---");
 	#endif
+
+	PrintToSerialNumber(data, "Successfully fetched shtore items.");
 }
