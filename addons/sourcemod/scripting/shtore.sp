@@ -438,7 +438,7 @@ void ShowShopSubMenu(int client, StoreItem category)
 
 	if(menu.ItemCount == 0)
 	{
-		menu.AddItem("-1", "No available items.");
+		menu.AddItem("-1", "No items found.");
 	}
 
 	menu.ExitButton = true;
@@ -451,7 +451,17 @@ public int MenuHandler_ShopSubmenu(Menu menu, MenuAction action, int param1, int
 {
 	if(action == MenuAction_Select)
 	{
-		ShowShopSubMenu(param1, gI_Category[param1]);
+		char sInfo[8];
+		menu.GetItem(param2, sInfo, 8);
+
+		int iInfo = StringToInt(sInfo);
+
+		if(iInfo == -1)
+		{
+			ShowShopSubMenu(param1, gI_Category[param1]);
+
+			return 0;
+		}
 
 		// TODO: buy item, add to inventory
 	}
@@ -476,9 +486,90 @@ public Action Command_Inventory(int client, int args)
 		return Plugin_Handled;
 	}
 
-	// TODO: open menu
+	return ShowInventoryMenu(client);
+}
+
+Action ShowInventoryMenu(int client, int position = 0)
+{
+	Menu menu = new Menu(MenuHandler_Inventory);
+	menu.SetTitle("Inventory\nCredits: %d\n ", gA_StoreUsers[client].iCredits);
+
+	int iLength = gA_StoreUsers[client].aItems.Length;
+
+	for(int i = 0; i < iLength; i++)
+	{
+		int iItemID = gA_StoreUsers[client].aItems.Get(i);
+
+		store_item_t item;
+		GetItemByID(iItemID, item);
+
+		char sDisplay[sizeof(store_item_t::sDisplay) + sizeof(store_item_t::sDescription) + 10];
+
+		if(strlen(item.sDescription) > 0)
+		{
+			FormatEx(sDisplay, sizeof(sDisplay), "%s\n%s\n ", item.sDisplay, item.sDescription);
+		}
+
+		else
+		{
+			FormatEx(sDisplay, sizeof(sDisplay), "%s\n ", item.sDisplay);
+		}
+
+		if(gA_StoreUsers[client].iEquippedItems[item.siType] == iItemID)
+		{
+			Format(sDisplay, sizeof(sDisplay), "(EQUIPPED) %s", sDisplay);
+		}
+
+		char sInfo[8];
+		IntToString(iItemID, sInfo, 8);
+
+		menu.AddItem(sInfo, sDisplay);
+	}
+
+	if(menu.ItemCount == 0)
+	{
+		menu.AddItem("-1", "No items found.");
+	}
+
+	menu.ExitButton = true;
+	menu.ExitBackButton = true;
+
+	menu.DisplayAt(client, position, 60);
 
 	return Plugin_Handled;
+}
+
+public int MenuHandler_Inventory(Menu menu, MenuAction action, int param1, int param2)
+{
+	if(action == MenuAction_Select)
+	{
+		char sInfo[8];
+		menu.GetItem(param2, sInfo, 8);
+
+		int iInfo = StringToInt(sInfo);
+
+		if(iInfo == -1)
+		{
+			ShowInventoryMenu(param1, GetMenuSelectionPosition());
+
+			return 0;
+		}
+
+		ShowInventoryMenu(param1, GetMenuSelectionPosition());
+		// TODO: equip/unequip
+	}
+
+	else if(action == MenuAction_Cancel && param2 == MenuCancel_ExitBack)
+	{
+		OpenStoreMenu(param1);
+	}
+
+	else if(action == MenuAction_End)
+	{
+		delete menu;
+	}
+
+	return 0;
 }
 
 public Action Command_Sell(int client, int args)
@@ -640,6 +731,7 @@ public void SQL_FetchItems_Callback(Database db, DBResultSet results, const char
 public int Native_GetUser(Handle handler, int numParams)
 {
 	int client = GetNativeCell(1);
+
 	SetNativeArray(2, gA_StoreUsers[client], sizeof(store_user_t));
 }
 
