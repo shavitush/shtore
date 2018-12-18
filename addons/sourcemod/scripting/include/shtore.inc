@@ -23,7 +23,7 @@
 #endif
 #define _shtore_included
 
-#define PREFIX "\x04[shtore]\x01"
+#define SHTORE_PREFIX "\x04[shtore]\x01"
 #define SHTORE_VERSION "1.0"
 #define MAX_NAME_LENGTH_SQL 32
 
@@ -115,8 +115,21 @@ stock PrintToSerialNumber(int serial, const char[] input)
 	}
 }
 
-// Shtore_SetCredits
-// Shtore_GetCredits
+/**
+ * Set a player's shtore credits.
+ *
+ * @param client					Client index.
+ * @param credits					Credits to set.
+ */
+native void Shtore_SetCredits(int client, int credits);
+
+/**
+ * Retrieve a player's store user.
+ *
+ * @param client					Client index.
+ * @param user						store_user_t object.
+ */
+native void Shtore_GetUser(int client, any user[sizeof(store_user_t)]);
 
 /**
  * Use this native when printing anything in chat if it's related to the timer.
@@ -170,6 +183,9 @@ public SharedPlugin __pl_shtore =
 #if !defined REQUIRE_PLUGIN
 public void __pl_shtore_SetNTVOptional()
 {
-	
+	MarkNativeAsOptional("Shtore_GetUser");
+	MarkNativeAsOptional("Shtore_LogMessage");
+	MarkNativeAsOptional("Shtore_PrintToChat");
+	MarkNativeAsOptional("Shtore_SetCredits");
 }
 #endif

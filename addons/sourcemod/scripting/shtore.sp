@@ -28,6 +28,7 @@
 
 // float gF_Refund_Rate = 0.75;
 
+char gS_LogPath[PLATFORM_MAX_PATH];
 Database gH_Database = null;
 
 ArrayList gA_Items = null;
@@ -45,6 +46,19 @@ public Plugin myinfo =
 	url = "https://github.com/shavitush/shtore"
 }
 
+public APLRes AskPluginLoad2(Handle myself, bool late, char[] error, int err_max)
+{
+	CreateNative("Shtore_GetUser", Native_GetUser);
+	CreateNative("Shtore_LogMessage", Native_LogMessage);
+	CreateNative("Shtore_PrintToChat", Native_PrintToChat);
+	CreateNative("Shtore_SetCredits", Native_SetCredits);
+
+	// registers library, check "bool LibraryExists(const char[] name)" in order to use with other plugins
+	RegPluginLibrary("shtore");
+
+	return APLRes_Success;
+}
+
 public void OnPluginStart()
 {
 	// globals
@@ -55,12 +69,19 @@ public void OnPluginStart()
 	RegAdminCmd("sm_reloadstoreitems", Command_ReloadStoreItems, ADMFLAG_RCON, "Fetches shtore items from database.");
 
 	// player commands
+	RegConsoleCmd("sm_shtore", Command_Store, "Opens the shtore menu.");
 	RegConsoleCmd("sm_store", Command_Store, "Opens the shtore menu.");
 	RegConsoleCmd("sm_shop", Command_Shop, "Opens the shop menu.");
 	RegConsoleCmd("sm_inv", Command_Inventory, "Opens your inventory.");
 	RegConsoleCmd("sm_inventory", Command_Inventory, "Opens your inventory.");
 	RegConsoleCmd("sm_sell", Command_Sell, "Sell an item.");
 	RegConsoleCmd("sm_credits", Command_Credits, "Show your or someone else's credits. Usage: sm_credits [target]");
+
+	// logs
+	BuildPath(Path_SM, gS_LogPath, PLATFORM_MAX_PATH, "logs/shtore.log");
+
+	// translations
+	LoadTranslations("common.phrases");
 
 	// late load
 	for(int i = 1; i <= MaxClients; i++)
@@ -474,7 +495,33 @@ public Action Command_Sell(int client, int args)
 
 public Action Command_Credits(int client, int args)
 {
-	// TODO: implement
+	int iStoreUser = client;
+	int target = -1;
+
+	if(args > 0)
+	{
+		char sArgs[MAX_TARGET_LENGTH];
+		GetCmdArgString(sArgs, MAX_TARGET_LENGTH);
+
+		target = FindTarget(client, sArgs, false, false);
+
+		if(target == -1)
+		{
+			return Plugin_Handled;
+		}
+
+		iStoreUser = target;
+	}
+
+	if(gA_StoreUsers[iStoreUser].iDatabaseID != -1)
+	{
+		Shtore_PrintToChat(client, "\x03%N\x01 has \x04%d credits\x01.", iStoreUser, gA_StoreUsers[iStoreUser].iCredits);
+	}
+
+	else
+	{
+		Shtore_PrintToChat(client, "\x03%N\x01 is not present in the shtore database.", iStoreUser);
+	}
 
 	return Plugin_Handled;
 }
@@ -588,4 +635,70 @@ public void SQL_FetchItems_Callback(Database db, DBResultSet results, const char
 	#endif
 
 	PrintToSerialNumber(data, "Successfully fetched shtore items.");
+}
+
+public int Native_GetUser(Handle handler, int numParams)
+{
+	int client = GetNativeCell(1);
+	SetNativeArray(2, gA_StoreUsers[client], sizeof(store_user_t));
+}
+
+public int Native_LogMessage(Handle plugin, int numParams)
+{
+	char sPlugin[32];
+
+	if(!GetPluginInfo(plugin, PlInfo_Name, sPlugin, 32))
+	{
+		GetPluginFilename(plugin, sPlugin, 32);
+	}
+
+	static int iWritten = 0;
+
+	char sBuffer[300];
+	FormatNativeString(0, 1, 2, 300, iWritten, sBuffer);
+	
+	LogToFileEx(gS_LogPath, "[%s] %s", sPlugin, sBuffer);
+}
+
+public int Native_PrintToChat(Handle handler, int numParams)
+{
+	int client = GetNativeCell(1);
+
+	if(!IsClientInGame(client))
+	{
+		return;
+	}
+
+	static int iWritten = 0; // useless?
+
+	char sBuffer[300];
+	FormatNativeString(0, 2, 3, 300, iWritten, sBuffer);
+	Format(sBuffer, 300, SHTORE_PREFIX ... " %s", sBuffer);
+
+	if(GetEngineVersion() != Engine_CSGO)
+	{
+		Handle hSayText2 = StartMessageOne("SayText2", client);
+
+		if(hSayText2 != null)
+		{
+			BfWriteByte(hSayText2, 0);
+			BfWriteByte(hSayText2, true);
+			BfWriteString(hSayText2, sBuffer);
+		}
+
+		EndMessage();
+	}
+
+	else
+	{
+		PrintToChat(client, " %s", sBuffer);
+	}
+}
+
+public int Native_SetCredits(Handle handler, int numParams)
+{
+	int client = GetNativeCell(1);
+	int credits = GetNativeCell(2);
+
+	gA_StoreUsers[client].iCredits = credits;
 }
