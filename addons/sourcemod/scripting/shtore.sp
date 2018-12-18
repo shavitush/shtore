@@ -29,7 +29,9 @@
 // float gF_Refund_Rate = 0.75;
 
 Database gH_Database = null;
+
 ArrayList gA_Items = null;
+ArrayList gA_ItemsMenu = null; // sorted
 
 int gI_Credits[MAXPLAYERS+1];
 StoreItem gI_Category[MAXPLAYERS+1];
@@ -122,12 +124,15 @@ public void SQL_GetStoreUser_Callback(Database db, DBResultSet results, const ch
 		gA_StoreUsers[client].iDatabaseID = results.FetchInt(0);
 		gA_StoreUsers[client].iCredits = results.FetchInt(1);
 
-		// TODO: fetch inventory and equipped items
+		char sFetchItemsQuery[128];
+		FormatEx(sFetchItemsQuery, 128, "SELECT item_id FROM store_inventories WHERE owner_id = %d;", gA_StoreUsers[client].iDatabaseID);
+		gH_Database.Query(SQL_FetchUserInventory_Callback, sFetchItemsQuery, data, DBPrio_High);
+
+		// TODO: fetch equipped items
 
 		char sUpdateQuery[128];
 		FormatEx(sUpdateQuery, 128, "UPDATE store_users SET name = '%s', lastlogin = %d WHERE id = %d;",
 			sName, GetTime(), gA_StoreUsers[client].iDatabaseID);
-
 		gH_Database.Query(SQL_InsertStoreUser_Callback, sUpdateQuery, data, DBPrio_High);
 	}
 
@@ -145,7 +150,6 @@ public void SQL_GetStoreUser_Callback(Database db, DBResultSet results, const ch
 		char sQuery[128];
 		FormatEx(sQuery, 128, "INSERT INTO store_users (auth, lastlogin, name) VALUES ('%s', %d, '%s');",
 			sAuth, GetTime(), sName);
-
 		gH_Database.Query(SQL_InsertStoreUser_Callback, sQuery, data, DBPrio_High);
 	}
 }
@@ -157,6 +161,44 @@ public void SQL_InsertStoreUser_Callback(Database db, DBResultSet results, const
 		LogError("shtore (insert store user) SQL query failed. Reason: %s", error);
 
 		return;
+	}
+}
+
+public void SQL_FetchUserInventory_Callback(Database db, DBResultSet results, const char[] error, any data)
+{
+	if(results == null)
+	{
+		LogError("shtore (fetch user inventory) SQL query failed. Reason: %s", error);
+
+		return;
+	}
+
+	int client = GetClientFromSerial(data);
+
+	if(client == 0)
+	{
+		return;
+	}
+
+	gA_StoreUsers[client].aItems = new ArrayList();
+
+	while(results.FetchRow())
+	{
+		int iItemID = results.FetchInt(0);
+
+		store_item_t item;
+		gA_Items.GetArray(iItemID - 1, item);
+
+		if(!item.bEnabled)
+		{
+			continue;
+		}
+
+		#if defined DEBUG
+		PrintToServer("%N | %d %s", client, iItemID, item.sDisplay);
+		#endif
+
+		gA_StoreUsers[client].aItems.Push(iItemID);
 	}
 }
 
@@ -292,12 +334,12 @@ void ShowShopSubMenu(int client, StoreItem category)
 	Menu menu = new Menu(MenuHandler_ShopSubmenu);
 	menu.SetTitle("Shop (%s)\nCredits: %d\n ", sCategory, gI_Credits[client]);
 
-	int iLength = gA_Items.Length;
+	int iLength = gA_ItemsMenu.Length;
 
 	for(int i = 0; i < iLength; i++)
 	{
 		store_item_t item;
-		gA_Items.GetArray(i, item);
+		gA_ItemsMenu.GetArray(i, item);
 
 		if(item.siType != category)
 		{
@@ -421,7 +463,7 @@ void FetchStoreItems(int client = 0)
 		serial = GetClientSerial(client);
 	}
 
-	gH_Database.Query(SQL_FetchItems_Callback, "SELECT type, price, display, description, value FROM store_items;", serial, DBPrio_High);
+	gH_Database.Query(SQL_FetchItems_Callback, "SELECT id, enabled, type, price, display, description, value FROM store_items;", serial, DBPrio_High);
 }
 
 public int StoreItems_SortAscending(int index1, int index2, Handle array, Handle hndl)
@@ -459,23 +501,26 @@ public void SQL_FetchItems_Callback(Database db, DBResultSet results, const char
 	}
 
 	gA_Items.Clear();
+	delete gA_ItemsMenu;
 
 	while(results.FetchRow())
 	{
-		store_item_t item;
-
 		char sType[32];
-		results.FetchString(0, sType, 32);
+		store_item_t item;
+		item.iItemID = results.FetchInt(0);
+		item.bEnabled = view_as<bool>(results.FetchInt(1));
+		results.FetchString(2, sType, 32);
 		item.siType = StoreItemToEnum(sType);
-		item.iPrice = results.FetchInt(1);
-		results.FetchString(2, item.sDisplay, 32);
-		results.FetchString(3, item.sDescription, 64);
-		results.FetchString(4, item.sValue, PLATFORM_MAX_PATH);
+		item.iPrice = results.FetchInt(3);
+		results.FetchString(4, item.sDisplay, 32);
+		results.FetchString(5, item.sDescription, 64);
+		results.FetchString(6, item.sValue, PLATFORM_MAX_PATH);
 
 		gA_Items.PushArray(item);
 	}
 
-	SortADTArrayCustom(gA_Items, StoreItems_SortAscending);
+	gA_ItemsMenu = gA_Items.Clone();
+	SortADTArrayCustom(gA_ItemsMenu, StoreItems_SortAscending);
 
 	#if defined DEBUG
 	PrintToServer("---");
@@ -486,8 +531,8 @@ public void SQL_FetchItems_Callback(Database db, DBResultSet results, const char
 		store_item_t item;
 		gA_Items.GetArray(i, item);
 
-		PrintToServer("[%d] Type: %d | Price: %d | Display: \"%s\" | Description: \"%s\" | Value: \"%s\"",
-			i, item.siType, item.iPrice, item.sDisplay, item.sDescription, item.sValue);
+		PrintToServer("[%d] Item ID: %d | %s | Type: %d | Price: %d | Display: \"%s\" | Description: \"%s\" | Value: \"%s\"",
+			i, item.iItemID, (item.bEnabled)? "Enabled":"Disabled", item.siType, item.iPrice, item.sDisplay, item.sDescription, item.sValue);
 	}
 
 	PrintToServer("---");

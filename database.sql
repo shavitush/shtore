@@ -7,6 +7,7 @@
 CREATE TABLE IF NOT EXISTS `store_items` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
   `type` enum('playermodel','chattitle','chatcolor') DEFAULT NULL,
+  `enabled` TINYINT NOT NULL DEFAULT '1',
   `price` int(11) NOT NULL DEFAULT '100',
   `display` varchar(50) NOT NULL DEFAULT 'undefined',
   `description` varchar(50) DEFAULT NULL,
@@ -23,6 +24,15 @@ CREATE TABLE IF NOT EXISTS `store_users` (
   `credits` int(11) NOT NULL DEFAULT '0',
   PRIMARY KEY (`id`),
   INDEX `auth` (`auth`)
+) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS `store_inventories` (
+  `id` INT(11) NOT NULL AUTO_INCREMENT,
+  `item_id` INT(11) NOT NULL DEFAULT '0',
+  `owner_id` INT(11) NOT NULL DEFAULT '0',
+  PRIMARY KEY (`id`),
+  INDEX `item_id` (`item_id`),
+  INDEX `owner_id` (`owner_id`)
 ) ENGINE=InnoDB;
 
 -- Dumping data for table shtore.store_items: ~0 rows (approximately)

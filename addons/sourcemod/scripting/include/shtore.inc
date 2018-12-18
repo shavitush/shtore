@@ -38,6 +38,8 @@ enum StoreItem
 
 enum struct store_item_t
 {
+	bool bEnabled;
+	int iItemID;
 	char sDisplay[32];
 	char sDescription[64];
 	char sValue[PLATFORM_MAX_PATH];
