@@ -26,7 +26,7 @@
 
 // #define DEBUG
 
-// float gF_Refund_Rate = 0.75;
+ConVar gCV_Refund_Tax = null;
 
 char gS_LogPath[PLATFORM_MAX_PATH];
 Database gH_Database = null;
@@ -77,6 +77,11 @@ public void OnPluginStart()
 	RegConsoleCmd("sm_sell", Command_Sell, "Sell an item.");
 	RegConsoleCmd("sm_credits", Command_Credits, "Show your or someone else's credits. Usage: sm_credits [target]");
 
+	// settings
+	CreateConVar("shtore_version", SHTORE_VERSION, "Plugin version.", (FCVAR_NOTIFY | FCVAR_DONTRECORD));
+	gCV_Refund_Tax = CreateConVar("shtore_refund_tax", "0.10", "Tax multiplier for item sales.", 0, true, 0.0, true, 1.0);
+	AutoExecConfig();
+
 	// logs
 	BuildPath(Path_SM, gS_LogPath, PLATFORM_MAX_PATH, "logs/shtore.log");
 
@@ -97,6 +102,11 @@ public void OnClientPutInServer(int client)
 	delete gA_StoreUsers[client].aItems;
 	gA_StoreUsers[client].iDatabaseID = -1;
 	gA_StoreUsers[client].iCredits = 0;
+
+	for(int i = 0; i < sizeof(store_user_t::iEquippedItems); i++)
+	{
+		gA_StoreUsers[client].iEquippedItems[i] = -1;
+	}
 
 	GetStoreUser(client);
 }
@@ -135,6 +145,10 @@ public void SQL_GetStoreUser_Callback(Database db, DBResultSet results, const ch
 	GetClientName(client, sName, MAX_NAME_LENGTH_SQL);
 	ReplaceString(sName, MAX_NAME_LENGTH_SQL, "#", "?");
 
+	int iLength = ((strlen(sName) * 2) + 1);
+	char[] sEscapedName = new char[iLength];
+	gH_Database.Escape(sName, sEscapedName, iLength);
+
 	if(results.FetchRow())
 	{
 		gA_StoreUsers[client].iDatabaseID = results.FetchInt(0);
@@ -144,11 +158,13 @@ public void SQL_GetStoreUser_Callback(Database db, DBResultSet results, const ch
 		FormatEx(sFetchItemsQuery, 128, "SELECT item_id FROM store_inventories WHERE owner_id = %d;", gA_StoreUsers[client].iDatabaseID);
 		gH_Database.Query(SQL_FetchUserInventory_Callback, sFetchItemsQuery, data, DBPrio_High);
 
-		// TODO: fetch equipped items
+		char sFetchEquippedItems[128];
+		FormatEx(sFetchEquippedItems, 128, "SELECT item_id, slot FROM store_equipped_items WHERE owner_id = %d;", gA_StoreUsers[client].iDatabaseID);
+		gH_Database.Query(SQL_FetchEquippedItems, sFetchEquippedItems, data, DBPrio_High);
 
 		char sUpdateQuery[128];
 		FormatEx(sUpdateQuery, 128, "UPDATE store_users SET name = '%s', lastlogin = %d WHERE id = %d;",
-			sName, GetTime(), gA_StoreUsers[client].iDatabaseID);
+			sEscapedName, GetTime(), gA_StoreUsers[client].iDatabaseID);
 		gH_Database.Query(SQL_UpdateStoreUser_Callback, sUpdateQuery, 0, DBPrio_High);
 	}
 
@@ -165,7 +181,7 @@ public void SQL_GetStoreUser_Callback(Database db, DBResultSet results, const ch
 
 		char sQuery[128];
 		FormatEx(sQuery, 128, "INSERT INTO store_users (auth, lastlogin, name) VALUES ('%s', %d, '%s');",
-			sAuth, GetTime(), sName);
+			sAuth, GetTime(), sEscapedName);
 		gH_Database.Query(SQL_InsertStoreUser_Callback, sQuery, data, DBPrio_High);
 	}
 }
@@ -195,6 +211,19 @@ public void SQL_InsertStoreUser_Callback(Database db, DBResultSet results, const
 	{
 		GetStoreUser(client);
 	}
+}
+
+bool UserHasItemEquipped(store_user_t user, store_item_t item)
+{
+	for(int i = 0; i < sizeof(store_user_t::iEquippedItems); i++)
+	{
+		if(item.iItemID == user.iEquippedItems[i])
+		{
+			return true;
+		}
+	}
+
+	return false;
 }
 
 bool UserOwnsItem(store_user_t user, store_item_t item)
@@ -232,6 +261,55 @@ bool GetItemByID(int itemid, store_item_t item)
 	}
 
 	return false;
+}
+
+public void SQL_FetchEquippedItems(Database db, DBResultSet results, const char[] error, any data)
+{
+	if(results == null)
+	{
+		LogError("shtore (fetch equipped items) SQL query failed. Reason: %s", error);
+
+		return;
+	}
+
+	int client = GetClientFromSerial(data);
+
+	if(client == 0)
+	{
+		return;
+	}
+
+	bool bInDatabase[sizeof(store_user_t::iEquippedItems)] = { false, ... };
+
+	while(results.FetchRow())
+	{
+		int iItemID = results.FetchInt(0);
+		int iSlot = results.FetchInt(1);
+
+		gA_StoreUsers[client].iEquippedItems[iSlot] = iItemID;
+		bInDatabase[iSlot] = true;
+	}
+
+	for(int i = 1; i < sizeof(bInDatabase); i++)
+	{
+		if(!bInDatabase[i])
+		{
+			char sInsertQuery[256];
+			FormatEx(sInsertQuery, 256, "INSERT INTO store_equipped_items (owner_id, slot, item_id) VALUES (%d, %d, -1);", 
+				gA_StoreUsers[client].iDatabaseID, i);
+			gH_Database.Query(SQL_AddMissingEquip_Callback, sInsertQuery, 0, DBPrio_High);
+		}
+	}
+}
+
+public void SQL_AddMissingEquip_Callback(Database db, DBResultSet results, const char[] error, any data)
+{
+	if(results == null)
+	{
+		LogError("shtore (add missing equip) SQL query failed. Reason: %s", error);
+
+		return;
+	}
 }
 
 public void SQL_FetchUserInventory_Callback(Database db, DBResultSet results, const char[] error, any data)
@@ -273,6 +351,8 @@ public void SQL_FetchUserInventory_Callback(Database db, DBResultSet results, co
 public void OnClientDisconnect(int client)
 {
 	SaveUserCredits(client);
+	SaveEquippedItems(client);
+
 	delete gA_StoreUsers[client].aItems;
 }
 
@@ -322,7 +402,9 @@ public int MenuHandler_Store(Menu menu, MenuAction action, int param1, int param
 	{
 		switch(param2)
 		{
-			case 0: OpenShopMenu(param1, true);
+			case 0: ShowShopMenu(param1);
+			case 1: ShowInventoryMenu(param1);
+			case 2: ShowSellMenu(param1);
 		}
 	}
 
@@ -341,10 +423,10 @@ public Action Command_Shop(int client, int args)
 		return Plugin_Handled;
 	}
 
-	return OpenShopMenu(client, false);
+	return ShowShopMenu(client);
 }
 
-Action OpenShopMenu(int client, bool submenu, int item = 0)
+Action ShowShopMenu(int client, int item = 0)
 {
 	Menu menu = new Menu(MenuHandler_Shop);
 	menu.SetTitle("Shop\nCredits: %d\n ", gA_StoreUsers[client].iCredits);
@@ -361,7 +443,7 @@ Action OpenShopMenu(int client, bool submenu, int item = 0)
 	}
 
 	menu.ExitButton = true;
-	menu.ExitBackButton = submenu;
+	menu.ExitBackButton = true;
 
 	menu.DisplayAt(client, item, 60);
 
@@ -491,7 +573,7 @@ public int MenuHandler_ShopSubmenu(Menu menu, MenuAction action, int param1, int
 
 	else if(action == MenuAction_Cancel && param2 == MenuCancel_ExitBack)
 	{
-		OpenShopMenu(param1, true);
+		ShowShopMenu(param1);
 	}
 
 	else if(action == MenuAction_End)
@@ -538,7 +620,7 @@ Action ShowInventoryMenu(int client, int position = 0)
 			FormatEx(sDisplay, sizeof(sDisplay), "%s\n ", item.sDisplay);
 		}
 
-		if(gA_StoreUsers[client].iEquippedItems[item.siType] == iItemID)
+		if(UserHasItemEquipped(gA_StoreUsers[client], item))
 		{
 			Format(sDisplay, sizeof(sDisplay), "(EQUIPPED) %s", sDisplay);
 		}
@@ -577,9 +659,21 @@ public int MenuHandler_Inventory(Menu menu, MenuAction action, int param1, int p
 
 			return 0;
 		}
+		
+		store_item_t item;
+		GetItemByID(iInfo, item);
+
+		if(gA_StoreUsers[param1].iEquippedItems[item.siType] == item.iItemID)
+		{
+			gA_StoreUsers[param1].iEquippedItems[item.siType] = -1;
+		}
+
+		else
+		{
+			gA_StoreUsers[param1].iEquippedItems[item.siType] = item.iItemID;
+		}
 
 		ShowInventoryMenu(param1, GetMenuSelectionPosition());
-		// TODO: equip/unequip
 	}
 
 	else if(action == MenuAction_Cancel && param2 == MenuCancel_ExitBack)
@@ -602,9 +696,111 @@ public Action Command_Sell(int client, int args)
 		return Plugin_Handled;
 	}
 
-	// TODO: open menu
+	return ShowSellMenu(client);
+}
+
+Action ShowSellMenu(int client)
+{
+	Menu menu = new Menu(MenuHandler_Sell);
+
+	if(gCV_Refund_Tax.FloatValue > 0.0)
+	{
+		menu.SetTitle("Sell\nYou will be taxed %d%% of the listed price.\nCredits: %d\n ", RoundToZero(gCV_Refund_Tax.FloatValue * 100), gA_StoreUsers[client].iCredits);
+	}
+
+	else
+	{
+		menu.SetTitle("Sell\nYou will receive a full refund.\nCredits: %d\n ", gA_StoreUsers[client].iCredits);
+	}
+
+	int iLength = gA_StoreUsers[client].aItems.Length;
+
+	for(int i = 0; i < iLength; i++)
+	{
+		int iItemID = gA_StoreUsers[client].aItems.Get(i);
+
+		store_item_t item;
+		GetItemByID(iItemID, item);
+
+		// no equipped items
+		if(gA_StoreUsers[client].iEquippedItems[item.siType] == iItemID)
+		{
+			continue;
+		}
+
+		char sDisplay[sizeof(store_item_t::sDisplay) + 10];
+		FormatEx(sDisplay, sizeof(sDisplay), "%s (%d)", item.sDisplay, item.iPrice);
+
+		char sInfo[8];
+		IntToString(iItemID, sInfo, 8);
+
+		menu.AddItem(sInfo, sDisplay);
+	}
+
+	if(menu.ItemCount == 0)
+	{
+		menu.AddItem("-1", "No items found.");
+	}
+
+	menu.ExitButton = true;
+	menu.ExitBackButton = true;
+
+	menu.Display(client, 60);
 
 	return Plugin_Handled;
+}
+
+public int MenuHandler_Sell(Menu menu, MenuAction action, int param1, int param2)
+{
+	if(action == MenuAction_Select)
+	{
+		char sInfo[8];
+		menu.GetItem(param2, sInfo, 8);
+
+		int iInfo = StringToInt(sInfo);
+
+		if(iInfo == -1)
+		{
+			ShowSellMenu(param1);
+
+			return 0;
+		}
+
+		store_item_t item;
+		GetItemByID(iInfo, item);
+
+		if(!UserOwnsItem(gA_StoreUsers[param1], item))
+		{
+			Shtore_PrintToChat(param1, "You do not own \x05%s\x01.", item.sDisplay);
+			ShowSellMenu(param1);
+
+			return 0;
+		}
+
+		int iRefund = RoundToFloor(item.iPrice - (item.iPrice * gCV_Refund_Tax.FloatValue));
+		gA_StoreUsers[param1].iCredits += iRefund;
+		SaveUserCredits(param1);
+
+		int index = gA_StoreUsers[param1].aItems.FindValue(item.iItemID);
+		gA_StoreUsers[param1].aItems.Erase(index);
+		RemoveItemFromDatabase(param1, item.iItemID);
+
+		Shtore_PrintToChat(param1, "You have returned \x05%s\x01 to the store and received a refund of \x04%d credits\x01.", item.sDisplay, iRefund);
+
+		ShowSellMenu(param1);
+	}
+
+	else if(action == MenuAction_Cancel && param2 == MenuCancel_ExitBack)
+	{
+		OpenStoreMenu(param1);
+	}
+
+	else if(action == MenuAction_End)
+	{
+		delete menu;
+	}
+
+	return 0;
 }
 
 public Action Command_Credits(int client, int args)
@@ -679,6 +875,27 @@ void SaveUserCredits(int client)
 	}
 }
 
+void SaveEquippedItems(int client)
+{
+	for(int i = 1; i < sizeof(store_user_t::iEquippedItems); i++)
+	{
+		char sUpdateQuery[128];
+		FormatEx(sUpdateQuery, 128, "UPDATE store_equipped_items SET item_id = %d WHERE owner_id = %d AND slot = %d;",
+			gA_StoreUsers[client].iEquippedItems[i], gA_StoreUsers[client].iDatabaseID, i);
+		gH_Database.Query(SQL_SaveEquippedItems_Callback, sUpdateQuery, 0, DBPrio_High);
+	}
+}
+
+public void SQL_SaveEquippedItems_Callback(Database db, DBResultSet results, const char[] error, any data)
+{
+	if(results == null)
+	{
+		LogError("shtore (save equipped items) SQL query failed. Reason: %s", error);
+
+		return;
+	}
+}
+
 void AddItemToDatabase(int client, int itemid)
 {
 	char sInsertQuery[128];
@@ -691,6 +908,23 @@ public void SQL_AddUserItem_Callback(Database db, DBResultSet results, const cha
 	if(results == null)
 	{
 		LogError("shtore (add user item) SQL query failed. Reason: %s", error);
+
+		return;
+	}
+}
+
+void RemoveItemFromDatabase(int client, int itemid)
+{
+	char sDeleteQuery[128];
+	FormatEx(sDeleteQuery, 128, "DELETE FROM store_inventories WHERE item_id = %d AND owner_id = %d;", itemid, gA_StoreUsers[client].iDatabaseID);
+	gH_Database.Query(SQL_DeleteUserItem_Callback, sDeleteQuery, 0, DBPrio_High);
+}
+
+public void SQL_DeleteUserItem_Callback(Database db, DBResultSet results, const char[] error, any data)
+{
+	if(results == null)
+	{
+		LogError("shtore (delete user item) SQL query failed. Reason: %s", error);
 
 		return;
 	}

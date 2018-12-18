@@ -125,6 +125,7 @@ native void Shtore_SetCredits(int client, int credits);
 
 /**
  * Retrieve a player's store user.
+ * NOTE: Do not modify the contents of user.aItems.
  *
  * @param client					Client index.
  * @param user						store_user_t object.
