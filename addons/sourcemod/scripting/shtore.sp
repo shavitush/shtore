@@ -26,8 +26,13 @@
 
 // #define DEBUG
 
+// float gF_Refund_Rate = 0.75;
+
 Database gH_Database = null;
 ArrayList gA_Items = null;
+
+int gI_Credits[MAXPLAYERS+1];
+StoreItem gI_Category[MAXPLAYERS+1];
 
 public Plugin myinfo =
 {
@@ -44,8 +49,16 @@ public void OnPluginStart()
 	gA_Items = new ArrayList(sizeof(store_item_t));
 	SQL_DBConnect();
 
-	// commands
+	// admin commands
 	RegAdminCmd("sm_reloadstoreitems", Command_ReloadStoreItems, ADMFLAG_RCON, "Fetches shtore items from database.");
+
+	// player commands
+	RegConsoleCmd("sm_store", Command_Store, "Opens the shtore menu.");
+	RegConsoleCmd("sm_shop", Command_Shop, "Opens the shop menu.");
+	RegConsoleCmd("sm_inv", Command_Inventory, "Opens your inventory.");
+	RegConsoleCmd("sm_inventory", Command_Inventory, "Opens your inventory.");
+	RegConsoleCmd("sm_sell", Command_Sell, "Sell an item.");
+	RegConsoleCmd("sm_credits", Command_Credits, "Show your or someone else's credits. Usage: sm_credits [target]");
 }
 
 public void OnMapStart()
@@ -54,6 +67,11 @@ public void OnMapStart()
 	{
 		FetchStoreItems();
 	}
+}
+
+public void OnClientPutInServer(int client)
+{
+	gI_Credits[client] = 0; // TODO: fetch from DB
 }
 
 public Action Command_ReloadStoreItems(int client, int args)
@@ -66,6 +84,213 @@ public Action Command_ReloadStoreItems(int client, int args)
 	}
 
 	FetchStoreItems(client);
+
+	return Plugin_Handled;
+}
+
+public Action Command_Store(int client, int args)
+{
+	if(client == 0)
+	{
+		return Plugin_Handled;
+	}
+
+	return OpenStoreMenu(client);
+}
+
+Action OpenStoreMenu(int client, int item = 0)
+{
+	Menu menu = new Menu(MenuHandler_Store);
+	menu.SetTitle("shtore\nCredits: %d\n ", gI_Credits[client]);
+
+	menu.AddItem("0", "Shop");
+	menu.AddItem("1", "Inventory");
+	menu.AddItem("2", "Sell");
+
+	menu.ExitButton = true;
+
+	menu.DisplayAt(client, item, 60);
+
+	return Plugin_Handled;
+}
+
+public int MenuHandler_Store(Menu menu, MenuAction action, int param1, int param2)
+{
+	if(action == MenuAction_Select)
+	{
+		switch(param2)
+		{
+			case 0: OpenShopMenu(param1, true);
+		}
+	}
+
+	else if(action == MenuAction_End)
+	{
+		delete menu;
+	}
+
+	return 0;
+}
+
+public Action Command_Shop(int client, int args)
+{
+	if(client == 0)
+	{
+		return Plugin_Handled;
+	}
+
+	return OpenShopMenu(client, false);
+}
+
+Action OpenShopMenu(int client, bool submenu, int item = 0)
+{
+	Menu menu = new Menu(MenuHandler_Shop);
+	menu.SetTitle("Shop\nCredits: %d\n ", gI_Credits[client]);
+
+	for(int i = 1; i < view_as<int>(StoreItem_SIZE); i++)
+	{
+		char sInfo[8];
+		IntToString(i, sInfo, 8);
+
+		char sCategory[32];
+		StoreItemEnumToString(view_as<StoreItem>(i), sCategory, 32);
+
+		menu.AddItem(sInfo, sCategory);
+	}
+
+	menu.ExitButton = true;
+	menu.ExitBackButton = submenu;
+
+	menu.DisplayAt(client, item, 60);
+
+	return Plugin_Handled;
+}
+
+public int MenuHandler_Shop(Menu menu, MenuAction action, int param1, int param2)
+{
+	if(action == MenuAction_Select)
+	{
+		char sInfo[8];
+		menu.GetItem(param2, sInfo, 8);
+
+		gI_Category[param1] = view_as<StoreItem>(StringToInt(sInfo));
+
+		ShowShopSubMenu(param1, gI_Category[param1]);
+	}
+
+	else if(action == MenuAction_Cancel && param2 == MenuCancel_ExitBack)
+	{
+		OpenStoreMenu(param1);
+	}
+
+	else if(action == MenuAction_End)
+	{
+		delete menu;
+	}
+
+	return 0;
+}
+
+void ShowShopSubMenu(int client, StoreItem category)
+{
+	char sCategory[32];
+	StoreItemEnumToString(view_as<StoreItem>(category), sCategory, 32);
+
+	Menu menu = new Menu(MenuHandler_ShopSubmenu);
+	menu.SetTitle("Shop (%s)\nCredits: %d\n ", sCategory, gI_Credits[client]);
+
+	int iLength = gA_Items.Length;
+
+	for(int i = 0; i < iLength; i++)
+	{
+		store_item_t item;
+		gA_Items.GetArray(i, item);
+
+		if(item.siType != category)
+		{
+			continue;
+		}
+
+		char sInfo[8];
+		IntToString(i, sInfo, 8);
+
+		char sDisplay[sizeof(store_item_t::sDisplay) + sizeof(store_item_t::sDescription) + 10];
+
+		if(strlen(item.sDescription) > 0)
+		{
+			FormatEx(sDisplay, sizeof(sDisplay), "%s (%d)\n%s\n ", item.sDisplay, item.iPrice, item.sDescription);
+		}
+
+		else
+		{
+			FormatEx(sDisplay, sizeof(sDisplay), "%s (%d)\n ", item.sDisplay, item.iPrice);
+		}
+
+		menu.AddItem(sInfo, sDisplay);
+
+		// TODO: don't show items that you already own
+	}
+
+	if(menu.ItemCount == 0)
+	{
+		menu.AddItem("-1", "No available items.");
+	}
+
+	menu.ExitButton = true;
+	menu.ExitBackButton = true;
+
+	menu.Display(client, 60);
+}
+
+public int MenuHandler_ShopSubmenu(Menu menu, MenuAction action, int param1, int param2)
+{
+	if(action == MenuAction_Select)
+	{
+		ShowShopSubMenu(param1, gI_Category[param1]);
+
+		// TODO: buy item, add to inventory
+	}
+
+	else if(action == MenuAction_Cancel && param2 == MenuCancel_ExitBack)
+	{
+		OpenShopMenu(param1, true);
+	}
+
+	else if(action == MenuAction_End)
+	{
+		delete menu;
+	}
+
+	return 0;
+}
+
+public Action Command_Inventory(int client, int args)
+{
+	if(client == 0)
+	{
+		return Plugin_Handled;
+	}
+
+	// TODO: open menu
+
+	return Plugin_Handled;
+}
+
+public Action Command_Sell(int client, int args)
+{
+	if(client == 0)
+	{
+		return Plugin_Handled;
+	}
+
+	// TODO: open menu
+
+	return Plugin_Handled;
+}
+
+public Action Command_Credits(int client, int args)
+{
+	// TODO: implement
 
 	return Plugin_Handled;
 }

@@ -32,7 +32,8 @@ enum StoreItem
 	StoreItem_Unknown,
 	StoreItem_PlayerModel,
 	StoreItem_ChatTitle,
-	StoreItem_ChatColor
+	StoreItem_ChatColor,
+	StoreItem_SIZE
 };
 
 enum struct store_item_t
@@ -64,6 +65,28 @@ stock StoreItem StoreItemToEnum(const char[] input)
 	return StoreItem_Unknown;
 }
 
+stock void StoreItemEnumToEntry(StoreItem storeitem, char[] buffer, int maxlen)
+{
+	switch(storeitem)
+	{
+		case StoreItem_PlayerModel: strcopy(buffer, maxlen, "playermodel");
+		case StoreItem_ChatTitle: strcopy(buffer, maxlen, "chattitle");
+		case StoreItem_ChatColor: strcopy(buffer, maxlen, "chatcolor");
+		default: strcopy(buffer, maxlen, "undefined");
+	}
+}
+
+stock void StoreItemEnumToString(StoreItem storeitem, char[] buffer, int maxlen)
+{
+	switch(storeitem)
+	{
+		case StoreItem_PlayerModel: strcopy(buffer, maxlen, "Player Model");
+		case StoreItem_ChatTitle: strcopy(buffer, maxlen, "Chat Title");
+		case StoreItem_ChatColor: strcopy(buffer, maxlen, "Chat Color");
+		default: strcopy(buffer, maxlen, "undefined");
+	}
+}
+
 stock PrintToSerialNumber(int serial, const char[] input)
 {
 	if(serial == -1)
@@ -81,6 +104,9 @@ stock PrintToSerialNumber(int serial, const char[] input)
 		}
 	}
 }
+
+// Shtore_SetCredits
+// Shtore_GetCredits
 
 /**
  * Use this native when printing anything in chat if it's related to the timer.
