@@ -33,7 +33,6 @@ Database gH_Database = null;
 ArrayList gA_Items = null;
 ArrayList gA_ItemsMenu = null; // sorted
 
-int gI_Credits[MAXPLAYERS+1];
 StoreItem gI_Category[MAXPLAYERS+1];
 store_user_t gA_StoreUsers[MAXPLAYERS+1];
 
@@ -87,6 +86,11 @@ public void OnClientPutInServer(int client)
 	gA_StoreUsers[client].iDatabaseID = -1;
 	gA_StoreUsers[client].iCredits = 0;
 
+	GetStoreUser(client);
+}
+
+void GetStoreUser(int client)
+{
 	char sAuth[32];
 
 	if(IsFakeClient(client) || !GetClientAuthId(client, AuthId_Steam3, sAuth, 32))
@@ -133,7 +137,7 @@ public void SQL_GetStoreUser_Callback(Database db, DBResultSet results, const ch
 		char sUpdateQuery[128];
 		FormatEx(sUpdateQuery, 128, "UPDATE store_users SET name = '%s', lastlogin = %d WHERE id = %d;",
 			sName, GetTime(), gA_StoreUsers[client].iDatabaseID);
-		gH_Database.Query(SQL_InsertStoreUser_Callback, sUpdateQuery, data, DBPrio_High);
+		gH_Database.Query(SQL_UpdateStoreUser_Callback, sUpdateQuery, 0, DBPrio_High);
 	}
 
 	else
@@ -154,6 +158,16 @@ public void SQL_GetStoreUser_Callback(Database db, DBResultSet results, const ch
 	}
 }
 
+public void SQL_UpdateStoreUser_Callback(Database db, DBResultSet results, const char[] error, any data)
+{
+	if(results == null)
+	{
+		LogError("shtore (update store user) SQL query failed. Reason: %s", error);
+
+		return;
+	}
+}
+
 public void SQL_InsertStoreUser_Callback(Database db, DBResultSet results, const char[] error, any data)
 {
 	if(results == null)
@@ -161,6 +175,13 @@ public void SQL_InsertStoreUser_Callback(Database db, DBResultSet results, const
 		LogError("shtore (insert store user) SQL query failed. Reason: %s", error);
 
 		return;
+	}
+
+	int client = GetClientFromSerial(data);
+
+	if(client != 0)
+	{
+		GetStoreUser(client);
 	}
 }
 
@@ -222,8 +243,18 @@ public void SQL_FetchUserInventory_Callback(Database db, DBResultSet results, co
 
 public void OnClientDisconnect(int client)
 {
-	// TODO: update db
-	// TODO: move to update
+	if(gA_StoreUsers[client].iDatabaseID != -1)
+	{
+		char sName[MAX_NAME_LENGTH_SQL];
+		GetClientName(client, sName, MAX_NAME_LENGTH_SQL);
+		ReplaceString(sName, MAX_NAME_LENGTH_SQL, "#", "?");
+
+		char sUpdateQuery[128];
+		FormatEx(sUpdateQuery, 128, "UPDATE store_users SET name = '%s', lastlogin = %d, credits = %d WHERE id = %d;",
+			sName, GetTime(), gA_StoreUsers[client].iCredits, gA_StoreUsers[client].iDatabaseID);
+		gH_Database.Query(SQL_UpdateStoreUser_Callback, sUpdateQuery, 0, DBPrio_High);
+	}
+
 	delete gA_StoreUsers[client].aItems;
 }
 
@@ -254,7 +285,7 @@ public Action Command_Store(int client, int args)
 Action OpenStoreMenu(int client, int item = 0)
 {
 	Menu menu = new Menu(MenuHandler_Store);
-	menu.SetTitle("shtore\nCredits: %d\n ", gI_Credits[client]);
+	menu.SetTitle("shtore\nCredits: %d\n ", gA_StoreUsers[client].iCredits);
 
 	menu.AddItem("0", "Shop");
 	menu.AddItem("1", "Inventory");
@@ -298,7 +329,7 @@ public Action Command_Shop(int client, int args)
 Action OpenShopMenu(int client, bool submenu, int item = 0)
 {
 	Menu menu = new Menu(MenuHandler_Shop);
-	menu.SetTitle("Shop\nCredits: %d\n ", gI_Credits[client]);
+	menu.SetTitle("Shop\nCredits: %d\n ", gA_StoreUsers[client].iCredits);
 
 	for(int i = 1; i < view_as<int>(StoreItem_SIZE); i++)
 	{
@@ -350,7 +381,7 @@ void ShowShopSubMenu(int client, StoreItem category)
 	StoreItemEnumToString(view_as<StoreItem>(category), sCategory, 32);
 
 	Menu menu = new Menu(MenuHandler_ShopSubmenu);
-	menu.SetTitle("Shop (%s)\nCredits: %d\n ", sCategory, gI_Credits[client]);
+	menu.SetTitle("Shop (%s)\nCredits: %d\n ", sCategory, gA_StoreUsers[client].iCredits);
 
 	int iLength = gA_ItemsMenu.Length;
 
