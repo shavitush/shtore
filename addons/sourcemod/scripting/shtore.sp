@@ -206,6 +206,23 @@ public void SQL_InsertStoreUser_Callback(Database db, DBResultSet results, const
 	}
 }
 
+bool UserOwnsItem(store_user_t user, store_item_t item)
+{
+	int iLength = user.aItems.Length;
+
+	for(int i = 0; i < iLength; i++)
+	{
+		int iItemID = user.aItems.Get(i);
+
+		if(item.iItemID == iItemID)
+		{
+			return true;
+		}
+	}
+
+	return false;
+}
+
 bool GetItemByID(int itemid, store_item_t item)
 {
 	int iLength = gA_Items.Length;
@@ -411,7 +428,7 @@ void ShowShopSubMenu(int client, StoreItem category)
 		store_item_t item;
 		gA_ItemsMenu.GetArray(i, item);
 
-		if(item.siType != category)
+		if(item.siType != category || UserOwnsItem(gA_StoreUsers[client], item))
 		{
 			continue;
 		}
@@ -432,8 +449,6 @@ void ShowShopSubMenu(int client, StoreItem category)
 		}
 
 		menu.AddItem(sInfo, sDisplay);
-
-		// TODO: don't show items that you already own
 	}
 
 	if(menu.ItemCount == 0)
