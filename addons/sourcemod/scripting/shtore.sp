@@ -113,15 +113,22 @@ public void SQL_GetStoreUser_Callback(Database db, DBResultSet results, const ch
 		return;
 	}
 
+	char sName[MAX_NAME_LENGTH_SQL];
+	GetClientName(client, sName, MAX_NAME_LENGTH_SQL);
+	ReplaceString(sName, MAX_NAME_LENGTH_SQL, "#", "?");
+
 	if(results.FetchRow())
 	{
 		gA_StoreUsers[client].iDatabaseID = results.FetchInt(0);
 		gA_StoreUsers[client].iCredits = results.FetchInt(1);
 
-		PrintToServer("%N id %d credits %d", client, gA_StoreUsers[client].iDatabaseID, gA_StoreUsers[client].iCredits);
-
 		// TODO: fetch inventory and equipped items
-		// TODO: update name in database
+
+		char sUpdateQuery[128];
+		FormatEx(sUpdateQuery, 128, "UPDATE store_users SET name = '%s', lastlogin = %d WHERE id = %d;",
+			sName, GetTime(), gA_StoreUsers[client].iDatabaseID);
+
+		gH_Database.Query(SQL_InsertStoreUser_Callback, sUpdateQuery, data, DBPrio_High);
 	}
 
 	else
@@ -135,19 +142,11 @@ public void SQL_GetStoreUser_Callback(Database db, DBResultSet results, const ch
 			return;
 		}
 
-		char sName[MAX_NAME_LENGTH_SQL];
-		GetClientName(client, sName, MAX_NAME_LENGTH_SQL);
-		ReplaceString(sName, MAX_NAME_LENGTH_SQL, "#", "?");
-
-		int iTime = GetTime();
-
-		char sQuery[256];
-		FormatEx(sQuery, 256, "INSERT INTO store_users (auth, lastlogin, name) VALUES ('%s', %d, '%s') ON DUPLICATE KEY UPDATE name = '%s', lastlogin = %d;",
-			sAuth, iTime, sName, sName, iTime);
+		char sQuery[128];
+		FormatEx(sQuery, 128, "INSERT INTO store_users (auth, lastlogin, name) VALUES ('%s', %d, '%s');",
+			sAuth, GetTime(), sName);
 
 		gH_Database.Query(SQL_InsertStoreUser_Callback, sQuery, data, DBPrio_High);
-
-		// TODO: insert to database
 	}
 }
 
