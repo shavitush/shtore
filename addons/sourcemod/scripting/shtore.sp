@@ -705,12 +705,12 @@ Action ShowSellMenu(int client)
 
 	if(gCV_Refund_Tax.FloatValue > 0.0)
 	{
-		menu.SetTitle("Sell\nYou will be taxed %d%% of the listed price.\nCredits: %d\n ", RoundToZero(gCV_Refund_Tax.FloatValue * 100), gA_StoreUsers[client].iCredits);
+		menu.SetTitle("Sell\nYou cannot sell equipped items.\nYou will be taxed %d%% of the listed price.\nCredits: %d\n ", RoundToZero(gCV_Refund_Tax.FloatValue * 100), gA_StoreUsers[client].iCredits);
 	}
 
 	else
 	{
-		menu.SetTitle("Sell\nYou will receive a full refund.\nCredits: %d\n ", gA_StoreUsers[client].iCredits);
+		menu.SetTitle("Sell\nYou cannot sell equipped items.\nYou will receive a full refund.\nCredits: %d\n ", gA_StoreUsers[client].iCredits);
 	}
 
 	int iLength = gA_StoreUsers[client].aItems.Length;
