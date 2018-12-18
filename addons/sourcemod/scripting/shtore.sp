@@ -164,6 +164,26 @@ public void SQL_InsertStoreUser_Callback(Database db, DBResultSet results, const
 	}
 }
 
+bool GetItemByID(int itemid, store_item_t item)
+{
+	int iLength = gA_Items.Length;
+
+	for(int i = 0; i < iLength; i++)
+	{
+		store_item_t tempitem;
+		gA_Items.GetArray(i, tempitem);
+
+		if(tempitem.iItemID == itemid)
+		{
+			item = tempitem;
+
+			return true;
+		}
+	}
+
+	return false;
+}
+
 public void SQL_FetchUserInventory_Callback(Database db, DBResultSet results, const char[] error, any data)
 {
 	if(results == null)
@@ -184,12 +204,10 @@ public void SQL_FetchUserInventory_Callback(Database db, DBResultSet results, co
 
 	while(results.FetchRow())
 	{
+		store_item_t item;
 		int iItemID = results.FetchInt(0);
 
-		store_item_t item;
-		gA_Items.GetArray(iItemID - 1, item);
-
-		if(!item.bEnabled)
+		if(!GetItemByID(iItemID, item) || !item.bEnabled)
 		{
 			continue;
 		}
