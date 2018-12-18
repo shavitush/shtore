@@ -27,6 +27,10 @@
 // #define DEBUG
 
 ConVar gCV_Refund_Tax = null;
+ConVar gCV_Credits_Distribution = null;
+ConVar gCV_Credits_NoSpectators = null;
+ConVar gCV_Credits_Min = null;
+ConVar gCV_Credits_Max = null;
 
 char gS_LogPath[PLATFORM_MAX_PATH];
 Database gH_Database = null;
@@ -80,6 +84,10 @@ public void OnPluginStart()
 	// settings
 	CreateConVar("shtore_version", SHTORE_VERSION, "Plugin version.", (FCVAR_NOTIFY | FCVAR_DONTRECORD));
 	gCV_Refund_Tax = CreateConVar("shtore_refund_tax", "0.10", "Tax multiplier for item sales.", 0, true, 0.0, true, 1.0);
+	gCV_Credits_Distribution = CreateConVar("shtore_credits_distribution", "300", "Distribute credits every N seconds.\nRestart map for changes to be applied.", 0, true, 1.0);
+	gCV_Credits_NoSpectators = CreateConVar("shtore_credits_nospectators", "1", "Exclude spectators from credits distribution.", 0, true, 0.0, true, 1.0);
+	gCV_Credits_Min = CreateConVar("shtore_credits_min", "10", "Minimum range of credits to randomly distribute.", 0, true, 0.0);
+	gCV_Credits_Max = CreateConVar("shtore_credits_max", "20", "Maximum range of credits to randomly distribute.", 0, true, 0.0);
 	AutoExecConfig();
 
 	// logs
@@ -95,6 +103,41 @@ public void OnMapStart()
 	{
 		FetchStoreItems();
 	}
+
+	if(gCV_Credits_Distribution.FloatValue > 0.0)
+	{
+		CreateTimer(gCV_Credits_Distribution.FloatValue, Timer_Credits, 0, TIMER_REPEAT|TIMER_FLAG_NO_MAPCHANGE);
+	}
+}
+
+int RealRandomInt(int min, int max)
+{
+	int random = GetURandomInt();
+
+	if(random == 0)
+	{
+		random++;
+	}
+
+	return (RoundToCeil(float(random) / (2147483647.0 / float(max - min + 1))) + min - 1);
+}
+
+public Action Timer_Credits(Handle timer)
+{
+	for(int i = 1; i <= MaxClients; i++)
+	{
+		if(!IsClientInGame(i) || IsFakeClient(i) || (gCV_Credits_NoSpectators.BoolValue && GetClientTeam(i) <= 1))
+		{
+			continue;
+		}
+
+		int credits = RealRandomInt(gCV_Credits_Min.IntValue, gCV_Credits_Max.IntValue);
+		gA_StoreUsers[i].iCredits += credits;
+
+		Shtore_PrintToChat(i, "You have earned \x04%d credits\x01.", credits);
+	}
+
+	return Plugin_Continue;
 }
 
 public void OnClientPutInServer(int client)
