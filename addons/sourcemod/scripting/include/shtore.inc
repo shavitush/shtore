@@ -45,6 +45,14 @@ enum struct store_item_t
 	int iPrice;
 };
 
+enum struct store_user_t
+{
+	int iDatabaseID;
+	int iCredits;
+	ArrayList aItems;
+	int iEquippedItems[StoreItem_SIZE];
+}
+
 stock StoreItem StoreItemToEnum(const char[] input)
 {
 	if(StrEqual(input, "playermodel"))

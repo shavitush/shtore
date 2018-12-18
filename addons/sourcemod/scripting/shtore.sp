@@ -33,6 +33,7 @@ ArrayList gA_Items = null;
 
 int gI_Credits[MAXPLAYERS+1];
 StoreItem gI_Category[MAXPLAYERS+1];
+store_user_t gA_StoreUsers[MAXPLAYERS+1];
 
 public Plugin myinfo =
 {
@@ -59,6 +60,15 @@ public void OnPluginStart()
 	RegConsoleCmd("sm_inventory", Command_Inventory, "Opens your inventory.");
 	RegConsoleCmd("sm_sell", Command_Sell, "Sell an item.");
 	RegConsoleCmd("sm_credits", Command_Credits, "Show your or someone else's credits. Usage: sm_credits [target]");
+
+	// late load
+	for(int i = 1; i <= MaxClients; i++)
+	{
+		if(IsClientInGame(i))
+		{
+			OnClientPutInServer(i);
+		}
+	}
 }
 
 public void OnMapStart()
@@ -71,7 +81,91 @@ public void OnMapStart()
 
 public void OnClientPutInServer(int client)
 {
-	gI_Credits[client] = 0; // TODO: fetch from DB
+	delete gA_StoreUsers[client].aItems;
+	gA_StoreUsers[client].iDatabaseID = -1;
+	gA_StoreUsers[client].iCredits = 0;
+
+	char sAuth[32];
+
+	if(IsFakeClient(client) || !GetClientAuthId(client, AuthId_Steam3, sAuth, 32))
+	{
+		return;
+	}
+
+	char sQuery[128];
+	FormatEx(sQuery, 128, "SELECT id, credits FROM store_users WHERE auth = '%s';", sAuth);
+	gH_Database.Query(SQL_GetStoreUser_Callback, sQuery, GetClientSerial(client), DBPrio_High);
+}
+
+public void SQL_GetStoreUser_Callback(Database db, DBResultSet results, const char[] error, any data)
+{
+	if(results == null)
+	{
+		LogError("shtore (get store user) SQL query failed. Reason: %s", error);
+
+		return;
+	}
+
+	int client = GetClientFromSerial(data);
+
+	if(client == 0)
+	{
+		return;
+	}
+
+	if(results.FetchRow())
+	{
+		gA_StoreUsers[client].iDatabaseID = results.FetchInt(0);
+		gA_StoreUsers[client].iCredits = results.FetchInt(1);
+
+		PrintToServer("%N id %d credits %d", client, gA_StoreUsers[client].iDatabaseID, gA_StoreUsers[client].iCredits);
+
+		// TODO: fetch inventory and equipped items
+		// TODO: update name in database
+	}
+
+	else
+	{
+		char sAuth[32];
+
+		if(!GetClientAuthId(client, AuthId_Steam3, sAuth, 32))
+		{
+			KickClient(client, "Authentication failed.");
+
+			return;
+		}
+
+		char sName[MAX_NAME_LENGTH_SQL];
+		GetClientName(client, sName, MAX_NAME_LENGTH_SQL);
+		ReplaceString(sName, MAX_NAME_LENGTH_SQL, "#", "?");
+
+		int iTime = GetTime();
+
+		char sQuery[256];
+		FormatEx(sQuery, 256, "INSERT INTO store_users (auth, lastlogin, name) VALUES ('%s', %d, '%s') ON DUPLICATE KEY UPDATE name = '%s', lastlogin = %d;",
+			sAuth, iTime, sName, sName, iTime);
+
+		gH_Database.Query(SQL_InsertStoreUser_Callback, sQuery, data, DBPrio_High);
+
+		// TODO: insert to database
+	}
+}
+
+public void SQL_InsertStoreUser_Callback(Database db, DBResultSet results, const char[] error, any data)
+{
+	if(results == null)
+	{
+		LogError("shtore (insert store user) SQL query failed. Reason: %s", error);
+
+		return;
+	}
+}
+
+public void OnClientDisconnect(int client)
+{
+	// TODO: update db
+	// TODO: move to update
+	delete gA_StoreUsers[client].aItems;
 }
 
 public Action Command_ReloadStoreItems(int client, int args)

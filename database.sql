@@ -15,6 +15,16 @@ CREATE TABLE IF NOT EXISTS `store_items` (
   KEY `type` (`type`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+CREATE TABLE IF NOT EXISTS `store_users` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `auth` varchar(50) NOT NULL,
+  `lastlogin` int(11) NOT NULL,
+  `name` varchar(50) NULL DEFAULT NULL COLLATE 'utf8mb4_general_ci',
+  `credits` int(11) NOT NULL DEFAULT '0',
+  PRIMARY KEY (`id`),
+  INDEX `auth` (`auth`)
+) ENGINE=InnoDB;
+
 -- Dumping data for table shtore.store_items: ~0 rows (approximately)
 /*!40000 ALTER TABLE `store_items` DISABLE KEYS */;
 INSERT INTO `store_items` (`id`, `type`, `price`, `display`, `description`, `value`) VALUES
