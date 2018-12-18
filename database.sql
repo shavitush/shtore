@@ -31,6 +31,7 @@ CREATE TABLE IF NOT EXISTS `store_inventories` (
   `item_id` INT(11) NOT NULL DEFAULT '0',
   `owner_id` INT(11) NOT NULL DEFAULT '0',
   PRIMARY KEY (`id`),
+  UNIQUE INDEX `itempair` (`item_id`, `owner_id`),
   INDEX `item_id` (`item_id`),
   INDEX `owner_id` (`owner_id`)
 ) ENGINE=InnoDB;

@@ -82,15 +82,6 @@ public void OnPluginStart()
 
 	// translations
 	LoadTranslations("common.phrases");
-
-	// late load
-	for(int i = 1; i <= MaxClients; i++)
-	{
-		if(IsClientInGame(i))
-		{
-			OnClientPutInServer(i);
-		}
-	}
 }
 
 public void OnMapStart()
@@ -281,18 +272,7 @@ public void SQL_FetchUserInventory_Callback(Database db, DBResultSet results, co
 
 public void OnClientDisconnect(int client)
 {
-	if(gA_StoreUsers[client].iDatabaseID != -1)
-	{
-		char sName[MAX_NAME_LENGTH_SQL];
-		GetClientName(client, sName, MAX_NAME_LENGTH_SQL);
-		ReplaceString(sName, MAX_NAME_LENGTH_SQL, "#", "?");
-
-		char sUpdateQuery[128];
-		FormatEx(sUpdateQuery, 128, "UPDATE store_users SET name = '%s', lastlogin = %d, credits = %d WHERE id = %d;",
-			sName, GetTime(), gA_StoreUsers[client].iCredits, gA_StoreUsers[client].iDatabaseID);
-		gH_Database.Query(SQL_UpdateStoreUser_Callback, sUpdateQuery, 0, DBPrio_High);
-	}
-
+	SaveUserCredits(client);
 	delete gA_StoreUsers[client].aItems;
 }
 
@@ -434,7 +414,7 @@ void ShowShopSubMenu(int client, StoreItem category)
 		}
 
 		char sInfo[8];
-		IntToString(i, sInfo, 8);
+		IntToString(item.iItemID, sInfo, 8);
 
 		char sDisplay[sizeof(store_item_t::sDisplay) + sizeof(store_item_t::sDescription) + 10];
 
@@ -478,7 +458,35 @@ public int MenuHandler_ShopSubmenu(Menu menu, MenuAction action, int param1, int
 			return 0;
 		}
 
-		// TODO: buy item, add to inventory
+		store_item_t item;
+		GetItemByID(iInfo, item);
+
+		if(gA_StoreUsers[param1].iCredits < item.iPrice)
+		{
+			Shtore_PrintToChat(param1, "The item \x05%s\x01 costs \x04%d credits\x01. You are missing \x04%d credits\x01.",
+				item.sDisplay, item.iPrice, item.iPrice - gA_StoreUsers[param1].iCredits);
+			ShowShopSubMenu(param1, gI_Category[param1]);
+
+			return 0;
+		}
+
+		if(UserOwnsItem(gA_StoreUsers[param1], item))
+		{
+			Shtore_PrintToChat(param1, "You already own \x05%s\x01", item.sDisplay);
+			ShowShopSubMenu(param1, gI_Category[param1]);
+
+			return 0;
+		}
+
+		gA_StoreUsers[param1].iCredits -= item.iPrice;
+		gA_StoreUsers[param1].aItems.Push(item.iItemID);
+
+		Shtore_PrintToChat(param1, "Successfully purchased \x05%s\x01 for \x04%d credits\x01.", item.sDisplay, item.iPrice);
+
+		SaveUserCredits(param1);
+		AddItemToDatabase(param1, item.iItemID);
+
+		ShowShopSubMenu(param1, gI_Category[param1]);
 	}
 
 	else if(action == MenuAction_Cancel && param2 == MenuCancel_ExitBack)
@@ -656,6 +664,38 @@ void SQL_DBConnect()
 	}
 }
 
+void SaveUserCredits(int client)
+{
+	if(gA_StoreUsers[client].iDatabaseID != -1)
+	{
+		char sName[MAX_NAME_LENGTH_SQL];
+		GetClientName(client, sName, MAX_NAME_LENGTH_SQL);
+		ReplaceString(sName, MAX_NAME_LENGTH_SQL, "#", "?");
+
+		char sUpdateQuery[128];
+		FormatEx(sUpdateQuery, 128, "UPDATE store_users SET name = '%s', lastlogin = %d, credits = %d WHERE id = %d;",
+			sName, GetTime(), gA_StoreUsers[client].iCredits, gA_StoreUsers[client].iDatabaseID);
+		gH_Database.Query(SQL_UpdateStoreUser_Callback, sUpdateQuery, 0, DBPrio_High);
+	}
+}
+
+void AddItemToDatabase(int client, int itemid)
+{
+	char sInsertQuery[128];
+	FormatEx(sInsertQuery, 128, "INSERT INTO store_inventories (item_id, owner_id) VALUES (%d, %d);", itemid, gA_StoreUsers[client].iDatabaseID);
+	gH_Database.Query(SQL_AddUserItem_Callback, sInsertQuery, 0, DBPrio_High);
+}
+
+public void SQL_AddUserItem_Callback(Database db, DBResultSet results, const char[] error, any data)
+{
+	if(results == null)
+	{
+		LogError("shtore (add user item) SQL query failed. Reason: %s", error);
+
+		return;
+	}
+}
+
 void FetchStoreItems(int client = 0)
 {
 	int serial = -1;
@@ -741,6 +781,14 @@ public void SQL_FetchItems_Callback(Database db, DBResultSet results, const char
 	#endif
 
 	PrintToSerialNumber(data, "Successfully fetched shtore items.");
+
+	for(int i = 1; i <= MaxClients; i++)
+	{
+		if(IsClientInGame(i))
+		{
+			OnClientPutInServer(i);
+		}
+	}
 }
 
 public int Native_GetUser(Handle handler, int numParams)
