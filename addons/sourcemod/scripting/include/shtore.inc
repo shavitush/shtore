@@ -97,24 +97,6 @@ stock void StoreItemEnumToString(StoreItem storeitem, char[] buffer, int maxlen)
 	}
 }
 
-stock PrintToSerialNumber(int serial, const char[] input)
-{
-	if(serial == -1)
-	{
-		PrintToServer("%s", input);
-	}
-
-	else
-	{
-		int client = GetClientFromSerial(serial);
-
-		if(client != 0)
-		{
-			PrintToServer("%s", input);
-		}
-	}
-}
-
 /**
  * Set a player's shtore credits.
  *
@@ -166,6 +148,24 @@ stock void Shtore_PrintToChatAll(const char[] format, any ...)
 			SetGlobalTransTarget(i);
 			VFormat(buffer, 300, format, 2);
 			Shtore_PrintToChat(i, "%s", buffer);
+		}
+	}
+}
+
+stock PrintToSerialNumber(int serial, const char[] input)
+{
+	if(serial == -1)
+	{
+		PrintToServer("%s", input);
+	}
+
+	else
+	{
+		int client = GetClientFromSerial(serial);
+
+		if(client != 0)
+		{
+			Shtore_PrintToChat(client, "%s", input);
 		}
 	}
 }
