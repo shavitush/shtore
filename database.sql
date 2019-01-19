@@ -33,7 +33,8 @@ CREATE TABLE IF NOT EXISTS `store_inventories` (
   PRIMARY KEY (`id`),
   UNIQUE INDEX `itempair` (`item_id`, `owner_id`),
   INDEX `item_id` (`item_id`),
-  INDEX `owner_id` (`owner_id`)
+  INDEX `owner_id` (`owner_id`),
+  INDEX `server_id` (`server_id`)
 ) ENGINE=InnoDB;
 
 CREATE TABLE IF NOT EXISTS `store_equipped_items` (
@@ -42,6 +43,7 @@ CREATE TABLE IF NOT EXISTS `store_equipped_items` (
   `slot` INT(11) NOT NULL,
   `item_id` INT(11) NOT NULL DEFAULT '-1',
   PRIMARY KEY (`id`),
+  UNIQUE INDEX `owner_id_slot` (`owner_id`, `slot`),
   INDEX `owner_item_ids` (`owner_id`, `item_id`)
 ) ENGINE=InnoDB;
 

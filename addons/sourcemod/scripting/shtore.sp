@@ -31,6 +31,7 @@ ConVar gCV_Credits_Distribution = null;
 ConVar gCV_Credits_NoSpectators = null;
 ConVar gCV_Credits_Min = null;
 ConVar gCV_Credits_Max = null;
+ConVar gCV_Items_Per_Server = null;
 
 char gS_LogPath[PLATFORM_MAX_PATH];
 Database gH_Database = null;
@@ -90,6 +91,7 @@ public void OnPluginStart()
 	gCV_Credits_NoSpectators = CreateConVar("shtore_credits_nospectators", "1", "Exclude spectators from credits distribution.", 0, true, 0.0, true, 1.0);
 	gCV_Credits_Min = CreateConVar("shtore_credits_min", "10", "Minimum range of credits to randomly distribute.", 0, true, 0.0);
 	gCV_Credits_Max = CreateConVar("shtore_credits_max", "20", "Maximum range of credits to randomly distribute.", 0, true, 0.0);
+	gCV_Items_Per_Server = CreateConVar("shtore_items_per_server", "1", "Enable to separate item purchases per server.", 0, true, 0.0, true, 1.0);
 
 	AutoExecConfig();
 
@@ -233,7 +235,10 @@ public void SQL_GetStoreUser_Callback(Database db, DBResultSet results, const ch
 		gA_StoreUsers[client].iCredits = results.FetchInt(1);
 
 		char sFetchItemsQuery[128];
-		FormatEx(sFetchItemsQuery, 128, "SELECT item_id FROM store_inventories WHERE owner_id = %d;", gA_StoreUsers[client].iDatabaseID);
+		FormatEx(sFetchItemsQuery, 128, (gCV_Items_Per_Server.BoolValue)?
+				"SELECT item_id FROM store_inventories WHERE owner_id = %d AND server_id = %d;":
+				"SELECT item_id FROM store_inventories WHERE owner_id = %d;",
+			gA_StoreUsers[client].iDatabaseID, gA_Settings.iServerID);
 		gH_Database.Query(SQL_FetchUserInventory_Callback, sFetchItemsQuery, data, DBPrio_High);
 
 		char sFetchEquippedItems[128];
@@ -364,16 +369,15 @@ public void SQL_FetchEquippedItems(Database db, DBResultSet results, const char[
 		int iItemID = results.FetchInt(0);
 		int iSlot = results.FetchInt(1);
 
+		bInDatabase[iSlot] = true;
+
 		store_item_t item;
 		GetItemByID(iItemID, item);
 
-		if(!gB_CategoryEnabled[item.siType])
+		if(gB_CategoryEnabled[item.siType])
 		{
-			continue;
+			gA_StoreUsers[client].iEquippedItems[iSlot] = iItemID;
 		}
-
-		gA_StoreUsers[client].iEquippedItems[iSlot] = iItemID;
-		bInDatabase[iSlot] = true;
 	}
 
 	for(int i = 1; i < sizeof(bInDatabase); i++)
@@ -992,7 +996,8 @@ public void SQL_SaveEquippedItems_Callback(Database db, DBResultSet results, con
 void AddItemToDatabase(int client, int itemid)
 {
 	char sInsertQuery[128];
-	FormatEx(sInsertQuery, 128, "INSERT INTO store_inventories (item_id, owner_id) VALUES (%d, %d);", itemid, gA_StoreUsers[client].iDatabaseID);
+	FormatEx(sInsertQuery, 128, "INSERT INTO store_inventories (item_id, owner_id, server_id) VALUES (%d, %d, %d);",
+		itemid, gA_StoreUsers[client].iDatabaseID, gA_Settings.iServerID);
 	gH_Database.Query(SQL_AddUserItem_Callback, sInsertQuery, 0, DBPrio_High);
 }
 
@@ -1009,7 +1014,10 @@ public void SQL_AddUserItem_Callback(Database db, DBResultSet results, const cha
 void RemoveItemFromDatabase(int client, int itemid)
 {
 	char sDeleteQuery[128];
-	FormatEx(sDeleteQuery, 128, "DELETE FROM store_inventories WHERE item_id = %d AND owner_id = %d;", itemid, gA_StoreUsers[client].iDatabaseID);
+	FormatEx(sDeleteQuery, 128, (gCV_Items_Per_Server.BoolValue)?
+			"DELETE FROM store_inventories WHERE item_id = %d AND owner_id = %d AND server_id = %d;":
+			"DELETE FROM store_inventories WHERE item_id = %d AND owner_id = %d;",
+		itemid, gA_StoreUsers[client].iDatabaseID, gA_Settings.iServerID);
 	gH_Database.Query(SQL_DeleteUserItem_Callback, sDeleteQuery, 0, DBPrio_High);
 }
 
