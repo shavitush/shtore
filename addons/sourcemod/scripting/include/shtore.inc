@@ -26,6 +26,7 @@
 #define SHTORE_PREFIX "\x04[shtore]\x01"
 #define SHTORE_VERSION "1.0"
 #define MAX_NAME_LENGTH_SQL 32
+#define STORE_CONFIG_PATH "configs/shtore.cfg"
 
 enum StoreItem
 {
@@ -34,6 +35,11 @@ enum StoreItem
 	StoreItem_ChatTitle,
 	StoreItem_ChatColor,
 	StoreItem_SIZE
+};
+
+enum struct store_settings_t
+{
+	int iServerID;
 };
 
 enum struct store_item_t

@@ -34,6 +34,7 @@ ConVar gCV_Credits_Max = null;
 
 char gS_LogPath[PLATFORM_MAX_PATH];
 Database gH_Database = null;
+store_settings_t gA_Settings;
 
 ArrayList gA_Items = null;
 ArrayList gA_ItemsMenu = null; // sorted
@@ -88,7 +89,18 @@ public void OnPluginStart()
 	gCV_Credits_NoSpectators = CreateConVar("shtore_credits_nospectators", "1", "Exclude spectators from credits distribution.", 0, true, 0.0, true, 1.0);
 	gCV_Credits_Min = CreateConVar("shtore_credits_min", "10", "Minimum range of credits to randomly distribute.", 0, true, 0.0);
 	gCV_Credits_Max = CreateConVar("shtore_credits_max", "20", "Maximum range of credits to randomly distribute.", 0, true, 0.0);
+
 	AutoExecConfig();
+
+	if(!LoadStoreConfig(STORE_CONFIG_PATH))
+	{
+		SetFailState("Could not load config from path \"%s\".", STORE_CONFIG_PATH);
+	}
+
+	if(gA_Settings.iServerID == -1)
+	{
+		SetFailState("Server ID cannot be -1.");
+	}
 
 	// logs
 	BuildPath(Path_SM, gS_LogPath, PLATFORM_MAX_PATH, "logs/shtore.log");
@@ -108,6 +120,27 @@ public void OnMapStart()
 	{
 		CreateTimer(gCV_Credits_Distribution.FloatValue, Timer_Credits, 0, TIMER_REPEAT|TIMER_FLAG_NO_MAPCHANGE);
 	}
+}
+
+bool LoadStoreConfig(const char[] path)
+{
+	char sPath[PLATFORM_MAX_PATH];
+	BuildPath(Path_SM, sPath, PLATFORM_MAX_PATH, path);
+
+	KeyValues kv = new KeyValues("shtore");
+
+	if(!kv.ImportFromFile(sPath))
+	{
+		delete kv;
+
+		return false;
+	}
+
+	gA_Settings.iServerID = kv.GetNum("server_id", -1);
+
+	delete kv;
+
+	return true;
 }
 
 int RealRandomInt(int min, int max)
