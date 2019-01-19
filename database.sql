@@ -45,6 +45,12 @@ CREATE TABLE IF NOT EXISTS `store_equipped_items` (
   INDEX `owner_item_ids` (`owner_id`, `item_id`)
 ) ENGINE=InnoDB;
 
+CREATE TABLE IF NOT EXISTS `store_categories` (
+  `server_id` TINYINT(4) NOT NULL,
+  `categories` SET('playermodel','chattitle','chatcolor') NOT NULL,
+  PRIMARY KEY (`server_Id`)
+) ENGINE=InnoDB;
+
 -- Dumping data for table shtore.store_items: ~0 rows (approximately)
 /*!40000 ALTER TABLE `store_items` DISABLE KEYS */;
 INSERT INTO `store_items` (`id`, `type`, `price`, `display`, `description`, `value`) VALUES

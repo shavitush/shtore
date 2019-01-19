@@ -41,6 +41,7 @@ ArrayList gA_ItemsMenu = null; // sorted
 
 StoreItem gI_Category[MAXPLAYERS+1];
 store_user_t gA_StoreUsers[MAXPLAYERS+1];
+bool gB_CategoryEnabled[StoreItem_SIZE];
 
 public Plugin myinfo =
 {
@@ -92,9 +93,9 @@ public void OnPluginStart()
 
 	AutoExecConfig();
 
-	if(!LoadStoreConfig(STORE_CONFIG_PATH))
+	if(!LoadStoreConfig(SHTORE_CONFIG_PATH))
 	{
-		SetFailState("Could not load config from path \"%s\".", STORE_CONFIG_PATH);
+		SetFailState("Could not load config from path \"%s\".", SHTORE_CONFIG_PATH);
 	}
 
 	if(gA_Settings.iServerID == -1)
@@ -113,6 +114,7 @@ public void OnMapStart()
 {
 	if(gH_Database != null)
 	{
+		FetchStoreCategories();
 		FetchStoreItems();
 	}
 
@@ -362,6 +364,14 @@ public void SQL_FetchEquippedItems(Database db, DBResultSet results, const char[
 		int iItemID = results.FetchInt(0);
 		int iSlot = results.FetchInt(1);
 
+		store_item_t item;
+		GetItemByID(iItemID, item);
+
+		if(!gB_CategoryEnabled[item.siType])
+		{
+			continue;
+		}
+
 		gA_StoreUsers[client].iEquippedItems[iSlot] = iItemID;
 		bInDatabase[iSlot] = true;
 	}
@@ -404,6 +414,7 @@ public void SQL_FetchUserInventory_Callback(Database db, DBResultSet results, co
 		return;
 	}
 
+	delete gA_StoreUsers[client].aItems;
 	gA_StoreUsers[client].aItems = new ArrayList();
 
 	while(results.FetchRow())
@@ -411,13 +422,13 @@ public void SQL_FetchUserInventory_Callback(Database db, DBResultSet results, co
 		store_item_t item;
 		int iItemID = results.FetchInt(0);
 
-		if(!GetItemByID(iItemID, item) || !item.bEnabled)
+		if(!GetItemByID(iItemID, item) || !item.bEnabled || !gB_CategoryEnabled[item.siType])
 		{
 			continue;
 		}
 
 		#if defined DEBUG
-		PrintToServer("%N | %d %s", client, iItemID, item.sDisplay);
+		PrintToChat(client, "%d %s", iItemID, item.sDisplay);
 		#endif
 
 		gA_StoreUsers[client].aItems.Push(iItemID);
@@ -441,6 +452,7 @@ public Action Command_ReloadStoreItems(int client, int args)
 		return Plugin_Handled;
 	}
 
+	FetchStoreCategories(client);
 	FetchStoreItems(client);
 
 	return Plugin_Handled;
@@ -511,6 +523,11 @@ Action ShowShopMenu(int client, int item = 0)
 	{
 		char sInfo[8];
 		IntToString(i, sInfo, 8);
+
+		if(!gB_CategoryEnabled[i])
+		{
+			continue;
+		}
 
 		char sCategory[32];
 		StoreItemEnumToString(view_as<StoreItem>(i), sCategory, 32);
@@ -1006,6 +1023,63 @@ public void SQL_DeleteUserItem_Callback(Database db, DBResultSet results, const 
 	}
 }
 
+void FetchStoreCategories(int client = 0)
+{
+	int serial = -1;
+
+	if(client != 0)
+	{
+		serial = GetClientSerial(client);
+	}
+
+	for(int i = 0; i <= SHOTRE_CATEGORIES; i++)
+	{
+		gB_CategoryEnabled[i] = false;
+	}
+
+	char sQuery[128];
+	FormatEx(sQuery, 128, "SELECT categories FROM store_categories WHERE server_id = %d;", gA_Settings.iServerID);
+	gH_Database.Query(SQL_FetchCategories_Callback, sQuery, serial, DBPrio_High);
+}
+
+public void SQL_FetchCategories_Callback(Database db, DBResultSet results, const char[] error, any data)
+{
+	if(results == null)
+	{
+		LogError("shtore (item categories) SQL query failed. Reason: %s", error);
+
+		return;
+	}
+
+	if(!results.FetchRow())
+	{
+		SetFailState("Could not find categories for server_id %d!", gA_Settings.iServerID);
+
+		return;
+	}
+
+	char sCategories[128];
+	results.FetchString(0, sCategories, 128);
+
+	if(strlen(sCategories) == 0)
+	{
+		SetFailState("Could not find categories for server_id %d!", gA_Settings.iServerID);
+
+		return;
+	}
+
+	char sCategoriesExploded[SHOTRE_CATEGORIES][32];
+	int iExplodedStrings = ExplodeString(sCategories, ",", sCategoriesExploded, SHOTRE_CATEGORIES, 32, false);
+
+	for(int i = 0; i < iExplodedStrings; i++)
+	{
+		StoreItem iCategory = StoreItemToEnum(sCategoriesExploded[i]);
+		gB_CategoryEnabled[iCategory] = true;
+	}
+
+	PrintToSerialNumber(data, "Successfully fetched shtore categories.");
+}
+
 void FetchStoreItems(int client = 0)
 {
 	int serial = -1;
@@ -1067,6 +1141,11 @@ public void SQL_FetchItems_Callback(Database db, DBResultSet results, const char
 		results.FetchString(4, item.sDisplay, 32);
 		results.FetchString(5, item.sDescription, 64);
 		results.FetchString(6, item.sValue, PLATFORM_MAX_PATH);
+
+		if(!gB_CategoryEnabled[item.siType])
+		{
+			continue;
+		}
 
 		gA_Items.PushArray(item);
 	}

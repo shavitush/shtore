@@ -23,10 +23,14 @@
 #endif
 #define _shtore_included
 
+#if !defined MAX_NAME_LENGTH_SQL
+#define MAX_NAME_LENGTH_SQL 32
+#endif
+
 #define SHTORE_PREFIX "\x04[shtore]\x01"
 #define SHTORE_VERSION "1.0"
-#define MAX_NAME_LENGTH_SQL 32
-#define STORE_CONFIG_PATH "configs/shtore.cfg"
+#define SHTORE_CONFIG_PATH "configs/shtore.cfg"
+#define SHOTRE_CATEGORIES 3
 
 enum StoreItem
 {
