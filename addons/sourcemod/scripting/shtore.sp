@@ -985,13 +985,13 @@ void FetchStoreItems(int client = 0)
 	gH_Database.Query(SQL_FetchItems_Callback, "SELECT id, enabled, type, price, display, description, value FROM store_items;", serial, DBPrio_High);
 }
 
-public int StoreItems_SortAscending(int index1, int index2, Handle array, Handle hndl)
+public int StoreItems_SortAscending(int index1, int index2, any array, any hndl)
 {
 	store_item_t item;
-	GetArrayArray(array, index1, item);
+	view_as<ArrayList>(array).GetArray(index1, item);
 	int price1 = item.iPrice;
 
-	GetArrayArray(array, index2, item);
+	view_as<ArrayList>(array).GetArray(index2, item);
 	int price2 = item.iPrice;
 
 	if(price1 < price2)
