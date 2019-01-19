@@ -30,6 +30,7 @@ CREATE TABLE IF NOT EXISTS `store_inventories` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
   `item_id` int(11) NOT NULL DEFAULT '0',
   `owner_id` int(11) NOT NULL DEFAULT '0',
+  `server_id` TINYINT(4) NOT NULL,
   PRIMARY KEY (`id`),
   UNIQUE INDEX `itempair` (`item_id`, `owner_id`),
   INDEX `item_id` (`item_id`),
