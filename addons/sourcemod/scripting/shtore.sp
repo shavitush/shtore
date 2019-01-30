@@ -364,6 +364,11 @@ public void SQL_FetchEquippedItems(Database db, DBResultSet results, const char[
 
 	bool bInDatabase[sizeof(store_user_t::iEquippedItems)] = { false, ... };
 
+	for(int i = 0; i < sizeof(store_user_t::iEquippedItems); i++)
+	{
+		gA_StoreUsers[client].iEquippedItems[i] = -1;
+	}
+
 	while(results.FetchRow())
 	{
 		int iItemID = results.FetchInt(0);

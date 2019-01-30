@@ -5,31 +5,31 @@
 /*!40101 SET @OLD_SQL_MODE=@@SQL_MODE, SQL_MODE='NO_AUTO_VALUE_ON_ZERO' */;
 
 CREATE TABLE IF NOT EXISTS `store_items` (
-  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `id` INT(11) NOT NULL AUTO_INCREMENT,
   `type` enum('playermodel','chattitle','chatcolor') DEFAULT NULL,
   `enabled` TINYINT NOT NULL DEFAULT '1',
-  `price` int(11) NOT NULL DEFAULT '100',
-  `display` varchar(50) NOT NULL DEFAULT 'undefined',
-  `description` varchar(50) DEFAULT NULL,
-  `value` varchar(50) DEFAULT NULL,
+  `price` INT(11) NOT NULL DEFAULT '100',
+  `display` VARCHAR(50) NOT NULL DEFAULT 'undefined',
+  `description` VARCHAR(50) DEFAULT NULL,
+  `value` VARCHAR(50) DEFAULT NULL,
   PRIMARY KEY (`id`),
   KEY `type` (`type`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE IF NOT EXISTS `store_users` (
-  `id` int(11) NOT NULL AUTO_INCREMENT,
-  `auth` varchar(50) NOT NULL,
-  `lastlogin` int(11) NOT NULL,
-  `name` varchar(50) NULL DEFAULT NULL COLLATE 'utf8mb4_general_ci',
-  `credits` int(11) NOT NULL DEFAULT '0',
+  `id` INT(11) NOT NULL AUTO_INCREMENT,
+  `auth` VARCHAR(50) NOT NULL,
+  `lastlogin` INT(11) NOT NULL,
+  `name` VARCHAR(50) NULL DEFAULT NULL COLLATE 'utf8mb4_general_ci',
+  `credits` INT(11) NOT NULL DEFAULT '0',
   PRIMARY KEY (`id`),
   INDEX `auth` (`auth`)
 ) ENGINE=InnoDB;
 
 CREATE TABLE IF NOT EXISTS `store_inventories` (
-  `id` int(11) NOT NULL AUTO_INCREMENT,
-  `item_id` int(11) NOT NULL DEFAULT '0',
-  `owner_id` int(11) NOT NULL DEFAULT '0',
+  `id` INT(11) NOT NULL AUTO_INCREMENT,
+  `item_id` INT(11) NOT NULL DEFAULT '0',
+  `owner_id` INT(11) NOT NULL DEFAULT '0',
   `server_id` TINYINT(4) NOT NULL,
   PRIMARY KEY (`id`),
   UNIQUE INDEX `itempair` (`item_id`, `owner_id`),
