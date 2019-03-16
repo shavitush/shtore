@@ -30,12 +30,13 @@
 #define SHTORE_PREFIX "\x04[shtore]\x01"
 #define SHTORE_VERSION "1.0"
 #define SHTORE_CONFIG_PATH "configs/shtore.cfg"
-#define SHOTRE_CATEGORIES 3
+#define SHOTRE_CATEGORIES 4
 
 enum StoreItem
 {
 	StoreItem_Unknown,
-	StoreItem_PlayerModel,
+	StoreItem_CTPlayerModel,
+	StoreItem_TPlayerModel,
 	StoreItem_ChatTitle,
 	StoreItem_ChatColor,
 	StoreItem_SIZE
@@ -44,7 +45,7 @@ enum StoreItem
 enum struct store_settings_t
 {
 	int iServerID;
-};
+}
 
 enum struct store_item_t
 {
@@ -55,7 +56,7 @@ enum struct store_item_t
 	char sValue[PLATFORM_MAX_PATH];
 	StoreItem siType;
 	int iPrice;
-};
+}
 
 enum struct store_user_t
 {
@@ -67,9 +68,14 @@ enum struct store_user_t
 
 stock StoreItem StoreItemToEnum(const char[] input)
 {
-	if(StrEqual(input, "playermodel"))
+	if(StrEqual(input, "ctplayermodel"))
 	{
-		return StoreItem_PlayerModel;
+		return StoreItem_CTPlayerModel;
+	}
+
+	else if(StrEqual(input, "tplayermodel"))
+	{
+		return StoreItem_TPlayerModel;
 	}
 
 	else if(StrEqual(input, "chattitle"))
@@ -89,7 +95,8 @@ stock void StoreItemEnumToEntry(StoreItem storeitem, char[] buffer, int maxlen)
 {
 	switch(storeitem)
 	{
-		case StoreItem_PlayerModel: strcopy(buffer, maxlen, "playermodel");
+		case StoreItem_CTPlayerModel: strcopy(buffer, maxlen, "ctplayermodel");
+		case StoreItem_TPlayerModel: strcopy(buffer, maxlen, "tplayermodel");
 		case StoreItem_ChatTitle: strcopy(buffer, maxlen, "chattitle");
 		case StoreItem_ChatColor: strcopy(buffer, maxlen, "chatcolor");
 		default: strcopy(buffer, maxlen, "undefined");
@@ -100,7 +107,8 @@ stock void StoreItemEnumToString(StoreItem storeitem, char[] buffer, int maxlen)
 {
 	switch(storeitem)
 	{
-		case StoreItem_PlayerModel: strcopy(buffer, maxlen, "Player Model");
+		case StoreItem_CTPlayerModel: strcopy(buffer, maxlen, "Counter-Terrorist Model");
+		case StoreItem_TPlayerModel: strcopy(buffer, maxlen, "Terrorist Model");
 		case StoreItem_ChatTitle: strcopy(buffer, maxlen, "Chat Title");
 		case StoreItem_ChatColor: strcopy(buffer, maxlen, "Chat Color");
 		default: strcopy(buffer, maxlen, "undefined");

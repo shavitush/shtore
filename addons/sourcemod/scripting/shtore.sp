@@ -19,7 +19,10 @@
 */
 
 #include <sourcemod>
+#include <sdktools>
+#include <cstrike>
 #include <shtore>
+#include <chat-processor>
 
 #pragma newdecls required
 #pragma semicolon 1
@@ -68,6 +71,9 @@ public APLRes AskPluginLoad2(Handle myself, bool late, char[] error, int err_max
 
 public void OnPluginStart()
 {
+	// events
+	HookEvent("player_spawn", EventPlayerSpawn, EventHookMode_Pre);
+
 	// globals
 	gA_Items = new ArrayList(sizeof(store_item_t));
 	SQL_DBConnect();
@@ -124,6 +130,59 @@ public void OnMapStart()
 	{
 		CreateTimer(gCV_Credits_Distribution.FloatValue, Timer_Credits, 0, TIMER_REPEAT|TIMER_FLAG_NO_MAPCHANGE);
 	}
+
+	PrecacheModel("models/weapons/t_arms.mdl", true);
+	PrecacheModel("models/weapons/ct_arms.mdl", true);
+
+	DownloadFiles();
+}
+
+
+public void DownloadFiles()
+{
+	char sPath[PLATFORM_MAX_PATH];
+	BuildPath(Path_SM, sPath, PLATFORM_MAX_PATH, "configs/shtore_downloads.ini");
+	
+	if (!FileExists(sPath))
+	{
+		LogError("can't find shtore_downloads.ini");
+		return;
+	}
+	
+	File file = OpenFile(sPath, "rt");
+	while (!file.EndOfFile())
+	{
+		char cLine[255];
+		if (!file.ReadLine(cLine, 255))
+		{
+			break;
+		}
+		
+		if ((cLine[0] == '/' && cLine[1] == '/') || cLine[0] == ';' || cLine[0] == '\0' || cLine[0] == '#' || cLine[0] == '\n')
+		{
+			continue;
+		}
+		
+		TrimString(cLine);
+		
+		if (!FileExists(cLine))
+		{
+			LogMessage("Error: can't find file '%s'", cLine);
+		}
+		
+		if (StrContains(cLine, ".mdl", false) != -1)
+		{
+			PrecacheModel(cLine, true);
+			if(!IsModelPrecached(cLine))
+			{
+				LogMessage("Can't PrecacheModel the model: '%s'", cLine);
+			}
+		}
+		
+		AddFileToDownloadsTable(cLine);
+	}
+
+	delete file;
 }
 
 bool LoadStoreConfig(const char[] path)
@@ -157,6 +216,54 @@ int RealRandomInt(int min, int max)
 	}
 
 	return (RoundToCeil(float(random) / (2147483647.0 / float(max - min + 1))) + min - 1);
+}
+
+public Action EventPlayerSpawn(Event event, const char[] name, bool db)
+{
+	int client = GetClientOfUserId(event.GetInt("userid"));
+	
+	if (!IsClientConnected(client) || !IsClientInGame(client) || !IsPlayerAlive(client))
+	{
+		return;
+	}
+	
+	store_item_t item;
+	
+	if (GetClientTeam(client) == CS_TEAM_CT && gA_StoreUsers[client].iEquippedItems[StoreItem_CTPlayerModel] != -1)
+	{
+		GetItemByID(gA_StoreUsers[client].iEquippedItems[StoreItem_CTPlayerModel], item);
+		SetEntityModel(client, item.sValue);
+		SetEntPropString(client, Prop_Send, "m_szArmsModel", "models/weapons/ct_arms.mdl");
+	}
+	
+	else if (GetClientTeam(client) == CS_TEAM_T && gA_StoreUsers[client].iEquippedItems[StoreItem_TPlayerModel] != -1)
+	{
+		GetItemByID(gA_StoreUsers[client].iEquippedItems[StoreItem_TPlayerModel], item);
+		SetEntityModel(client, item.sValue);
+		SetEntPropString(client, Prop_Send, "m_szArmsModel", "models/weapons/t_arms.mdl");
+	}
+}
+
+public Action CP_OnChatMessage(int & client, ArrayList recipients, char[] flagstring, char[] name, char[] message, bool & processcolors, bool & removecolors)
+{
+	store_item_t item;
+	
+	PrintToChat(client, "%d", gA_StoreUsers[client].iEquippedItems[StoreItem_ChatTitle]);
+	if (gA_StoreUsers[client].iEquippedItems[StoreItem_ChatTitle] != -1)
+	{
+		GetItemByID(gA_StoreUsers[client].iEquippedItems[StoreItem_ChatTitle], item);
+		Format(name, MAXLENGTH_NAME, "%s{default}%s", item.sValue, name);
+	}
+	
+	
+	PrintToChat(client, "%d", gA_StoreUsers[client].iEquippedItems[StoreItem_ChatColor]);
+	if (gA_StoreUsers[client].iEquippedItems[StoreItem_ChatColor] != -1)
+	{
+		GetItemByID(gA_StoreUsers[client].iEquippedItems[StoreItem_ChatColor], item);
+		Format(message, MAXLENGTH_MESSAGE, "%s%s", item.sValue, message);
+	}
+	
+	return Plugin_Changed;
 }
 
 public Action Timer_Credits(Handle timer)
