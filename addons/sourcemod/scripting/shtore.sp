@@ -96,7 +96,7 @@ public void OnPluginStart()
 	gCV_Credits_Distribution = CreateConVar("shtore_credits_distribution", "300", "Distribute credits every N seconds.\nRestart map for changes to be applied.", 0, true, 1.0);
 	gCV_Credits_NoSpectators = CreateConVar("shtore_credits_nospectators", "1", "Exclude spectators from credits distribution.", 0, true, 0.0, true, 1.0);
 	gCV_Credits_Min = CreateConVar("shtore_credits_min", "10", "Minimum range of credits to randomly distribute.", 0, true, 0.0);
-	gCV_Credits_Max = CreateConVar("shtore_credits_max", "20", "Maximum range of credits to randomly distribute.", 0, true, 0.0);
+	gCV_Credits_Max = CreateConVar("shtore_credits_max", "15", "Maximum range of credits to randomly distribute.", 0, true, 0.0);
 	gCV_Items_Per_Server = CreateConVar("shtore_items_per_server", "1", "Enable to separate item purchases per server.", 0, true, 0.0, true, 1.0);
 
 	AutoExecConfig();
@@ -248,15 +248,12 @@ public Action CP_OnChatMessage(int & client, ArrayList recipients, char[] flagst
 {
 	store_item_t item;
 	
-	PrintToChat(client, "%d", gA_StoreUsers[client].iEquippedItems[StoreItem_ChatTitle]);
 	if (gA_StoreUsers[client].iEquippedItems[StoreItem_ChatTitle] != -1)
 	{
 		GetItemByID(gA_StoreUsers[client].iEquippedItems[StoreItem_ChatTitle], item);
-		Format(name, MAXLENGTH_NAME, "%s{default}%s", item.sValue, name);
+		Format(name, MAXLENGTH_NAME, "{red}%s {teamcolor}%s", item.sValue, name);
 	}
 	
-	
-	PrintToChat(client, "%d", gA_StoreUsers[client].iEquippedItems[StoreItem_ChatColor]);
 	if (gA_StoreUsers[client].iEquippedItems[StoreItem_ChatColor] != -1)
 	{
 		GetItemByID(gA_StoreUsers[client].iEquippedItems[StoreItem_ChatColor], item);
@@ -792,7 +789,6 @@ public int MenuHandler_ShopSubmenu(Menu menu, MenuAction action, int param1, int
 
 	return 0;
 }
-
 public Action Command_Inventory(int client, int args)
 {
 	if(client == 0)
@@ -803,39 +799,101 @@ public Action Command_Inventory(int client, int args)
 	return ShowInventoryMenu(client);
 }
 
-Action ShowInventoryMenu(int client, int position = 0)
+Action ShowInventoryMenu(int client, int item = 0)
 {
 	Menu menu = new Menu(MenuHandler_Inventory);
 	menu.SetTitle("Inventory\nCredits: %d\n ", gA_StoreUsers[client].iCredits);
+
+	for(int i = 1; i < view_as<int>(StoreItem_SIZE); i++)
+	{
+		char sInfo[8];
+		IntToString(i, sInfo, 8);
+
+		if(!gB_CategoryEnabled[i])
+		{
+			continue;
+		}
+
+		char sCategory[32];
+		StoreItemEnumToString(view_as<StoreItem>(i), sCategory, 32);
+
+		menu.AddItem(sInfo, sCategory);
+	}
+
+	menu.ExitButton = true;
+	menu.ExitBackButton = true;
+
+	menu.DisplayAt(client, item, 60);
+
+	return Plugin_Handled;
+}
+
+public int MenuHandler_Inventory(Menu menu, MenuAction action, int param1, int param2)
+{
+	if(action == MenuAction_Select)
+	{
+		char sInfo[8];
+		menu.GetItem(param2, sInfo, 8);
+
+		gI_Category[param1] = view_as<StoreItem>(StringToInt(sInfo));
+		
+		ShowInventorySubMenu(param1, gI_Category[param1]);
+	}
+
+	else if(action == MenuAction_Cancel && param2 == MenuCancel_ExitBack)
+	{
+		OpenStoreMenu(param1);
+	}
+
+	else if(action == MenuAction_End)
+	{
+		delete menu;
+	}
+
+	return 0;
+}
+
+void ShowInventorySubMenu(int client, StoreItem category)
+{
+	char sCategory[32];
+	StoreItemEnumToString(view_as<StoreItem>(category), sCategory, 32);
+
+	Menu menu = new Menu(MenuHandler_InventorySubMenu);
+	menu.SetTitle("Inventory (%s)\nCredits: %d\n ", sCategory, gA_StoreUsers[client].iCredits);
 
 	int iLength = gA_StoreUsers[client].aItems.Length;
 
 	for(int i = 0; i < iLength; i++)
 	{
 		int iItemID = gA_StoreUsers[client].aItems.Get(i);
-
+	
 		store_item_t item;
 		GetItemByID(iItemID, item);
+
+		if(item.siType != category)
+		{
+			continue;
+		}
 
 		char sDisplay[sizeof(store_item_t::sDisplay) + sizeof(store_item_t::sDescription) + 10];
 
 		if(strlen(item.sDescription) > 0)
 		{
-			FormatEx(sDisplay, sizeof(sDisplay), "%s\n%s\n ", item.sDisplay, item.sDescription);
+			FormatEx(sDisplay, sizeof(sDisplay), "%s (%d)\n%s\n ", item.sDisplay, item.iPrice, item.sDescription);
 		}
 
 		else
 		{
-			FormatEx(sDisplay, sizeof(sDisplay), "%s\n ", item.sDisplay);
+			FormatEx(sDisplay, sizeof(sDisplay), "%s (%d)\n ", item.sDisplay, item.iPrice);
 		}
-
+		
 		if(UserHasItemEquipped(gA_StoreUsers[client], item))
 		{
 			Format(sDisplay, sizeof(sDisplay), "(EQUIPPED) %s", sDisplay);
 		}
 
 		char sInfo[8];
-		IntToString(iItemID, sInfo, 8);
+		IntToString(item.iItemID, sInfo, 8);
 
 		menu.AddItem(sInfo, sDisplay);
 	}
@@ -848,12 +906,10 @@ Action ShowInventoryMenu(int client, int position = 0)
 	menu.ExitButton = true;
 	menu.ExitBackButton = true;
 
-	menu.DisplayAt(client, position, 60);
-
-	return Plugin_Handled;
+	menu.Display(client, 60);
 }
 
-public int MenuHandler_Inventory(Menu menu, MenuAction action, int param1, int param2)
+public int MenuHandler_InventorySubMenu(Menu menu, MenuAction action, int param1, int param2)
 {
 	if(action == MenuAction_Select)
 	{
@@ -864,7 +920,7 @@ public int MenuHandler_Inventory(Menu menu, MenuAction action, int param1, int p
 
 		if(iInfo == -1)
 		{
-			ShowInventoryMenu(param1, GetMenuSelectionPosition());
+			ShowInventorySubMenu(param1, gI_Category[param1]);
 
 			return 0;
 		}
@@ -882,12 +938,12 @@ public int MenuHandler_Inventory(Menu menu, MenuAction action, int param1, int p
 			gA_StoreUsers[param1].iEquippedItems[item.siType] = item.iItemID;
 		}
 
-		ShowInventoryMenu(param1, GetMenuSelectionPosition());
+		ShowInventorySubMenu(param1, gI_Category[param1]);
 	}
 
 	else if(action == MenuAction_Cancel && param2 == MenuCancel_ExitBack)
 	{
-		OpenStoreMenu(param1);
+		ShowInventoryMenu(param1);
 	}
 
 	else if(action == MenuAction_End)
