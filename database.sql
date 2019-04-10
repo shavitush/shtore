@@ -51,7 +51,7 @@ CREATE TABLE IF NOT EXISTS `store_equipped_items` (
 CREATE TABLE IF NOT EXISTS `store_categories` (
   `server_id` TINYINT(4) NOT NULL,
   `categories` SET('playermodel','chattitle','chatcolor') NOT NULL,
-  PRIMARY KEY (`server_Id`)
+  PRIMARY KEY (`server_id`)
 ) ENGINE=InnoDB;
 
 -- Dumping data for table shtore.store_items: ~0 rows (approximately)

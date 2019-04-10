@@ -15,11 +15,12 @@ A currently private SourceMod store plugin designed for [YourGame.co.il](https:/
 
 Will probably release this to the public once they're done:
 
+- [ ] Access to items/categories via flags/overrides.
 - [ ] Config file with categories.
 - [ ] Admin commands.
 - [ ] Logging.
 - [ ] Natives. (manipulating and obtaining user data, getting data about items/categories)
-- [ ] Fowards. (item purchase/sale, credit distribution)
+- [ ] Forwards. (item purchase/sale, credit distribution)
 - [ ] Some sort of interface for adding and editing items.
 
 ### Build status

@@ -44,7 +44,7 @@ enum StoreItem
 enum struct store_settings_t
 {
 	int iServerID;
-};
+}
 
 enum struct store_item_t
 {
@@ -55,7 +55,7 @@ enum struct store_item_t
 	char sValue[PLATFORM_MAX_PATH];
 	StoreItem siType;
 	int iPrice;
-};
+}
 
 enum struct store_user_t
 {
