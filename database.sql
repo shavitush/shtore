@@ -96,9 +96,8 @@ CREATE TABLE `store_users` (
   `credits` int(11) NOT NULL DEFAULT '0'
 ) ENGINE=InnoDB DEFAULT CHARSET=latin1;
 
---
--- Indexes for dumped tables
---
+  `server_id` TINYINT(4) NOT NULL,
+  `categories` SET('playermodel','chattitle','chatcolor') NOT NULL,
 
 --
 -- Indexes for table `store_categories`

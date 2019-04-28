@@ -1133,9 +1133,13 @@ void SaveUserCredits(int client)
 		GetClientName(client, sName, MAX_NAME_LENGTH_SQL);
 		ReplaceString(sName, MAX_NAME_LENGTH_SQL, "#", "?");
 
+		int iLength = ((strlen(sName) * 2) + 1);
+		char[] sEscapedName = new char[iLength];
+		gH_Database.Escape(sName, sEscapedName, iLength);
+
 		char sUpdateQuery[128];
 		FormatEx(sUpdateQuery, 128, "UPDATE store_users SET name = '%s', lastlogin = %d, credits = %d WHERE id = %d;",
-			sName, GetTime(), gA_StoreUsers[client].iCredits, gA_StoreUsers[client].iDatabaseID);
+			sEscapedName, GetTime(), gA_StoreUsers[client].iCredits, gA_StoreUsers[client].iDatabaseID);
 		gH_Database.Query(SQL_UpdateStoreUser_Callback, sUpdateQuery, 0, DBPrio_High);
 	}
 }
