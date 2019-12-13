@@ -1,6 +1,8 @@
 # shtore - shavit's store
 
-A currently private SourceMod store plugin designed for [YourGame.co.il](https://yourgame.co.il/).
+~~A currently private SourceMod store plugin designed for [YourGame.co.il](https://yourgame.co.il/).~~
+
+Open source, basic and lightweight SourceMod store plugin without any API. Hardcode that shit
 
 ## Core features
 
@@ -13,7 +15,7 @@ A currently private SourceMod store plugin designed for [YourGame.co.il](https:/
 
 ## Missing features
 
-Will probably release this to the public once they're done:
+~~Will probably release this to the public once they're done:~~ sike
 
 - [ ] Access to items/categories via flags/overrides.
 - [ ] Config file with categories.
